@@ -273,11 +273,14 @@
                 li.querySelector(".task-name").style.textDecoration = this.checked ? "line-through" : "none";
                 timerButton.style.visibility = this.checked ? "hidden" : "visible";
                 editButton.style.visibility = this.checked ? "hidden" : "visible";
+
+                li.style.height = this.checked ? "25px" : "auto";
+
                 if (this.checked) {
                     const timestamp = document.createElement("span");
                     timestamp.className = "timestamp";
                     timestamp.textContent = "Completed at " + new Date().toLocaleString();
-                    li.appendChild(timestamp);
+                    li.insertBefore(timestamp, deleteButton);
                 } else {
                     const timestamp = li.querySelector(".timestamp");
                     if (timestamp) {
@@ -306,6 +309,28 @@
                         isTimerStarted = true;
                     }
                 }
+
+                function startTimer(li, minutes) {
+                    const time = minutes * 60;
+                    const startTime = Date.now();
+                    const notificationAudio = new Audio('high-pitched-two-note-notification.mp3');
+                    const intervalId = setInterval(() => {
+                        const currentTime = Date.now();
+                        const elapsedSeconds = Math.floor((currentTime - startTime) / 1000);
+                        const remainingTime = Math.max(time - elapsedSeconds, 0);
+                        updateRemainingTime(li, remainingTime);
+
+                        if (remainingTime === 0) {
+                            clearInterval(intervalId);
+                            li.querySelector(".timer-button").textContent = "Set Timer";
+                            li.removeChild(li.querySelector(".timer-span"));
+                            isTimerStarted = false;
+                            notificationAudio.play();
+                            alert(`Time's up for task: ${li.querySelector(".task-name").textContent}`);
+                        }
+                    }, 1000);
+                    return intervalId;
+                }
             });
 
             editButton.className = "btn btn-secondary btn-sm";
@@ -322,24 +347,6 @@
             taskList.appendChild(li);
 
             initializeSortable();
-        }
-
-        function startTimer(li, minutes) {
-            const time = minutes * 60;
-            const startTime = Date.now();
-            const intervalId = setInterval(() => {
-                const currentTime = Date.now();
-                const elapsedSeconds = Math.floor((currentTime - startTime) / 1000);
-                const remainingTime = Math.max(time - elapsedSeconds, 0);
-                updateRemainingTime(li, remainingTime);
-
-                if (remainingTime === 0) {
-                    clearInterval(intervalId);
-                    alert(`Time's up for task: ${li.querySelector(".task-name").textContent}`);
-                    li.removeChild(li.querySelector(".timer-span"));
-                }
-            }, 1000);
-            return intervalId;
         }
 
         function updateRemainingTime(li, remainingTime) {
