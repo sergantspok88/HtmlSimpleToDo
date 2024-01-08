@@ -246,6 +246,10 @@
             const taskText = taskInput.value;
             taskInput.value = "";
 
+            addTaskByName(taskText, false);
+        }
+
+        function addTaskByName(taskText, checked) {
             const taskNameSpan = document.createElement("span");
             taskNameSpan.textContent = taskText;
             taskNameSpan.style.flex = "1"; // To make the task name span take up remaining space
@@ -266,25 +270,33 @@
             li.className = "list-group-item d-flex align-items-center justify-content-between"; // Apply Bootstrap classes for alignment
             const checkbox = document.createElement("input");
             checkbox.type = "checkbox";
-            checkbox.addEventListener("change", function() {
-                li.querySelector(".task-name").style.textDecoration = this.checked ? "line-through" : "none";
-                timerButton.style.visibility = this.checked ? "hidden" : "visible";
-                editButton.style.visibility = this.checked ? "hidden" : "visible";
+            checkbox.checked = checked;
 
-                li.style.height = this.checked ? "25px" : "auto";
+            checkbox.addEventListener("change", setStyleBasedOnChecked);
 
-                if (this.checked) {
+            function setStyleBasedOnChecked() {
+                setStyleBasedOnChecked2(li, timerButton, editButton, deleteButton, checkbox);
+            }
+
+            function setStyleBasedOnChecked2(li2, timerButton2, editButton2, deleteButton2, checkbox2) {
+                li2.querySelector(".task-name").style.textDecoration = checkbox2.checked ? "line-through" : "none";
+                timerButton2.style.visibility = checkbox2.checked ? "hidden" : "visible";
+                editButton2.style.visibility = checkbox2.checked ? "hidden" : "visible";
+
+                li2.style.height = checkbox2.checked ? "25px" : "auto";
+
+                if (checkbox2.checked) {
                     const timestamp = document.createElement("span");
                     timestamp.className = "timestamp";
                     timestamp.textContent = "Completed at " + new Date().toLocaleString();
-                    li.insertBefore(timestamp, deleteButton);
+                    li2.insertBefore(timestamp, deleteButton2);
                 } else {
-                    const timestamp = li.querySelector(".timestamp");
+                    const timestamp = li2.querySelector(".timestamp");
                     if (timestamp) {
-                        li.removeChild(timestamp);
+                        li2.removeChild(timestamp);
                     }
                 }
-            });
+            }
 
             let isTimerStarted = false;
             timerButton.className = "btn btn-secondary btn-sm timer-button";
@@ -343,6 +355,8 @@
             li.appendChild(deleteButton);
             taskList.appendChild(li);
 
+            setStyleBasedOnChecked2(li, timerButton, editButton, deleteButton, checkbox);
+
             initializeSortable();
         }
 
@@ -370,6 +384,36 @@
 
         // Initial call to set the clock
         updateClock();
+
+        //TODO: 
+        //- can save time of completion of task
+        //- running timer if any 
+        function saveTasksToLocalStorage() {
+            const tasks = Array.from(document.querySelectorAll('.list-group-item')).map(li => {
+                return {
+                    name: li.querySelector('.task-name').textContent,
+                    checked: li.querySelector('input[type="checkbox"]').checked
+                };
+            });
+
+            localStorage.setItem('tasks', JSON.stringify(tasks));
+        }
+
+        function loadTasksFromLocalStorage() {
+            const tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+
+            tasks.forEach(task => {
+                addTaskByName(task.name, task.checked);
+            });
+
+            initializeSortable();
+        }
+
+        // Load tasks from local storage when the page loads
+        window.addEventListener('load', loadTasksFromLocalStorage);
+
+        // Save tasks to local storage before the page is closed
+        window.addEventListener('beforeunload', saveTasksToLocalStorage);
 
         window.onload = function() {
             initializeSortable();
