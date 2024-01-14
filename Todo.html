@@ -84,6 +84,11 @@
             margin: 0 10px;
             /* 0 for bottom and top, 10 for left and right */
         }
+        
+        .mirror {
+            transform: scaleX(-1);
+            display: inline-block;
+        }
     </style>
 </head>
 
@@ -97,8 +102,8 @@
                     </div>
                     <div style="display:flex; justify-content:flex-end; align-items:center;">
                         <time id="stopwatch" class="display-4" style="padding-right: 5px;">00:00:00.0</time>
-                        <button class="btn btn-primary" onclick="myStopwatch.toggleStopwatch()" id="startPause" style="margin-left: 5px; margin-right: 5px;">Play</button>
-                        <button class="btn btn-danger" onclick="myStopwatch.resetStopwatch()" id="reset" style="margin-left: 5px;">Reset</button>
+                        <button class="btn btn-primary" onclick="myStopwatch.toggleStopwatch()" id="startPause" style="margin-left: 5px; margin-right: 5px; padding: 5px 20px;">&#x23F5;</button>
+                        <button class="btn btn-danger" onclick="myStopwatch.resetStopwatch()" id="reset" style="margin-left: 5px; padding: 5px 20px;">&#x23F9;</button>
                     </div>
                 </div>
             </div>
@@ -111,7 +116,7 @@
         </ul>
 
         <div class="input-group mb-3 justify-content-end">
-            <button class="btn btn-primary" id="deleteAllButton">Delete All</button>
+            <button class="btn btn-danger" id="deleteAllButton">Delete All</button>
         </div>
     </div>
 
@@ -122,8 +127,8 @@
                 this.stopwatchTimer = null;
                 this.isStopwatchRunning = false;
                 this.elapsedMilliseconds = 0;
-                this.playText = "Play";
-                this.pauseText = "Pause";
+                this.playText = "&#x23F5;";
+                this.pauseText = "&#x23F8;";
             }
 
             startStopwatch() {
@@ -314,7 +319,8 @@
 
             let isTimerStarted = false;
             timerButton.className = "btn btn-secondary btn-sm timer-button";
-            timerButton.textContent = "Set Timer";
+            timerButton.style = "padding: 5px 15px;"
+            timerButton.innerHTML = "&#x23F2;";
             let intervalId = -1;
             timerButton.addEventListener("click", function() {
                 if (isTimerStarted) {
@@ -356,8 +362,9 @@
                 }
             });
 
-            editButton.className = "btn btn-secondary btn-sm";
-            editButton.textContent = "Edit";
+            editButton.className = "btn btn-secondary btn-sm mirror";
+            editButton.innerHTML = "&#9998;";
+            editButton.style = "padding: 5px 15px;"
             editButton.addEventListener("click", function() {
                 editTask(li);
             });
