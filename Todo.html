@@ -78,6 +78,12 @@
         #deleteAllButton {
             margin-top: 20px;
         }
+        
+        .drag-handle {
+            cursor: grab;
+            margin: 0 10px;
+            /* 0 for bottom and top, 10 for left and right */
+        }
     </style>
 </head>
 
@@ -104,7 +110,7 @@
         <ul id="taskList" class="list-group">
         </ul>
 
-        <div class="input-group mb-3">
+        <div class="input-group mb-3 justify-content-end">
             <button class="btn btn-primary" id="deleteAllButton">Delete All</button>
         </div>
     </div>
@@ -186,7 +192,7 @@
             const taskList = document.getElementById("taskList");
             new Sortable(taskList, {
                 animation: 150,
-                handle: "li",
+                handle: ".drag-handle",
             });
         }
 
@@ -356,6 +362,11 @@
                 editTask(li);
             });
 
+            const dragHandle = document.createElement("span");
+            dragHandle.className = "drag-handle";
+            dragHandle.innerHTML = "&#9776;";
+
+            li.appendChild(dragHandle);
             li.appendChild(checkbox);
             li.appendChild(taskNameSpan);
             li.appendChild(editButton);
