@@ -56,7 +56,7 @@
             border: none;
             cursor: pointer;
             color: #dc3545;
-            font-size: 1.2rem;
+            font-size: 1.0rem;
             margin-left: 10px;
             transition: color 0.3s;
         }
@@ -66,13 +66,17 @@
         }
         
         .timer-span {
-            font-size: 0.8rem;
+            font-size: 1.0rem;
         }
         
         #currentTime,
         #stopwatch {
             font-family: 'Fira Code', monospace;
             font-size: 2.6em;
+        }
+        
+        #deleteAllButton {
+            margin-top: 20px;
         }
     </style>
 </head>
@@ -99,6 +103,10 @@
         </div>
         <ul id="taskList" class="list-group">
         </ul>
+
+        <div class="input-group mb-3">
+            <button class="btn btn-primary" id="deleteAllButton">Delete All</button>
+        </div>
     </div>
 
     <script>
@@ -257,7 +265,7 @@
 
             const deleteButton = document.createElement("button");
             deleteButton.className = "delete-button";
-            deleteButton.innerHTML = "&times;";
+            deleteButton.innerHTML = "X";
             deleteButton.addEventListener("click", function() {
                 taskList.removeChild(li);
             });
@@ -378,6 +386,14 @@
             // Use string interpolation to format the time mm:ss
             return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
         }
+
+        const deleteAllButton = document.getElementById("deleteAllButton");
+
+        deleteAllButton.addEventListener("click", function() {
+            while (taskList.firstChild) {
+                taskList.removeChild(taskList.firstChild);
+            }
+        });
 
         // Update the clock every second
         setInterval(updateClock, 1000);
