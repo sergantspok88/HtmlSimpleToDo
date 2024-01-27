@@ -326,7 +326,7 @@
                 if (isTimerStarted) {
                     clearInterval(intervalId);
                     li.removeChild(li.querySelector(".timer-span"));
-                    li.querySelector(".timer-button").textContent = "Set Timer";
+                    li.querySelector(".timer-button").innerHTML = "&#x23F2;";
                     isTimerStarted = false;
                 } else {
                     const time = prompt("Enter the time in minutes:");
@@ -334,7 +334,7 @@
                         intervalId = startTimer(li, parseInt(time));
                         //Update right away, because startTime will have first update only after 1s
                         updateRemainingTime(li, parseInt(time) * 60);
-                        li.querySelector(".timer-button").textContent = "Stop Timer";
+                        li.querySelector(".timer-button").innerHTML = "&#x23F9;";
                         isTimerStarted = true;
                     }
                 }
@@ -351,7 +351,7 @@
 
                         if (remainingTime === 0) {
                             clearInterval(intervalId);
-                            li.querySelector(".timer-button").textContent = "Set Timer";
+                            li.querySelector(".timer-button").innerHTML = "&#x23F2;";
                             li.removeChild(li.querySelector(".timer-span"));
                             isTimerStarted = false;
                             notificationAudio.play();
