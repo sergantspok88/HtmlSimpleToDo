@@ -1,0 +1,78 @@
+ul {
+    padding: 0;
+}
+
+li {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 5px 0;
+    padding: 8px;
+    border: 1px solid #d1d3e2;
+    border-radius: 5px;
+    font-size: 20px;
+}
+
+li:hover {
+    background-color: #292929;
+}
+
+li>* {
+    margin-right: 5px;
+}
+
+li>*:last-child {
+    margin-right: 0;
+}
+
+input[type="checkbox"] {
+    margin-right: 10px;
+}
+
+.list-group-item {
+    margin-bottom: 1px;
+}
+
+.timestamp {
+    font-size: 0.8rem;
+}
+
+.delete-button {
+    background-color: transparent;
+    border: none;
+    cursor: pointer;
+    color: #dc3545;
+    font-size: 1.0rem;
+    margin-left: 10px;
+    transition: color 0.3s;
+}
+
+.delete-button:hover {
+    color: #a71d2a;
+}
+
+.timer-span {
+    font-size: 1.0rem;
+}
+
+#currentTime,
+#stopwatch {
+    font-family: 'Fira Code', monospace;
+    font-size: 2.6em;
+}
+
+#deleteAllButton {
+    margin-top: 20px;
+}
+
+.drag-handle {
+    cursor: grab;
+    margin: 0 10px;
+    /* 0 for bottom and top, 10 for left and right */
+}
+
+.mirror {
+    transform: scaleX(-1);
+    display: inline-block;
+}
