@@ -182,7 +182,7 @@ function addTaskByName(taskText, checked) {
 
     editButton.className = "btn btn-secondary btn-sm mirror";
     editButton.innerHTML = "&#9998;";
-    editButton.style = "padding: 5px 15px;"
+    editButton.style = "padding: 5px 15px; margin-right:4px;"
     editButton.addEventListener("click", function() {
         editTask(li);
     });
