@@ -3,13 +3,14 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 8000;
 
-// Serve static files from the 'public' directory
+// Serve the app itself from the 'public' directory
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Route for serving your HTML file
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
+// Serve third-party libraries from node_modules, so the app works without internet access
+const vendor = (dir) => express.static(path.join(__dirname, 'node_modules', dir));
+app.use('/vendor/bootstrap', vendor('bootstrap/dist/css'));
+app.use('/vendor/sortablejs', vendor('sortablejs/modular'));
+app.use('/vendor/fira-code', vendor('@fontsource/fira-code'));
 
 // Start the server
 app.listen(PORT, () => {

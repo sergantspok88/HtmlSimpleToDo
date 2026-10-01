@@ -1,58 +1,78 @@
+import { formatStopwatch } from './time.js';
+import { setLabel } from './ui.js';
+
+const PLAY_ICON = "⏵";
+const PAUSE_ICON = "⏸";
+
 export class Stopwatch {
-    constructor() {
-        this.lastStopwatchTime = 0;
-        this.stopwatchTimer = null;
-        this.isStopwatchRunning = false;
-        this.elapsedMilliseconds = 0;
-        this.playText = "&#x23F5;";
-        this.pauseText = "&#x23F8;";
+    constructor(display, toggleButton) {
+        this.display = display;
+        this.toggleButton = toggleButton;
+        this.accumulatedMilliseconds = 0; // time from previous runs, before the last pause
+        this.startedAt = null; // performance.now() when the current run started, null while paused
+        this.frameId = 0;
     }
 
-    startStopwatch() {
-        this.lastStopwatchTime = new Date().getTime();
-        this.stopwatchTimer = setInterval(() => this.updateStopwatchDisplay(), 10);
-        document.getElementById("startPause").innerHTML = this.pauseText;
-        this.isStopwatchRunning = true;
+    get isRunning() {
+        return this.startedAt !== null;
     }
 
-    pauseStopwatch() {
-        clearInterval(this.stopwatchTimer);
-        document.getElementById("startPause").innerHTML = this.playText;
-        this.isStopwatchRunning = false;
+    get elapsedMilliseconds() {
+        const currentRun = this.isRunning ? performance.now() - this.startedAt : 0;
+        return this.accumulatedMilliseconds + currentRun;
     }
 
-    toggleStopwatch() {
-        if (this.isStopwatchRunning) {
-            this.pauseStopwatch();
+    start() {
+        if (this.isRunning) {
+            return;
+        }
+        this.startedAt = performance.now();
+        this.updateButton();
+        this.tick();
+    }
+
+    pause() {
+        if (!this.isRunning) {
+            return;
+        }
+        cancelAnimationFrame(this.frameId);
+        this.accumulatedMilliseconds = this.elapsedMilliseconds;
+        this.startedAt = null;
+        this.updateDisplay();
+        this.updateButton();
+    }
+
+    toggle() {
+        if (this.isRunning) {
+            this.pause();
         } else {
-            this.startStopwatch();
+            this.start();
         }
     }
 
-    resetStopwatch() {
-        clearInterval(this.stopwatchTimer);
-        this.elapsedMilliseconds = 0;
-        document.getElementById("stopwatch").innerHTML = this.formatMilliseconds(this.elapsedMilliseconds);
-        document.getElementById("startPause").innerHTML = this.playText;
-        this.isStopwatchRunning = false;
+    reset() {
+        cancelAnimationFrame(this.frameId);
+        this.accumulatedMilliseconds = 0;
+        this.startedAt = null;
+        this.updateDisplay();
+        this.updateButton();
     }
 
-    updateStopwatchDisplay() {
-        const now = new Date().getTime();
-        const elapsedMillisecondsSinceLast = now - this.lastStopwatchTime;
-        this.lastStopwatchTime = now;
-        this.elapsedMilliseconds += elapsedMillisecondsSinceLast;
-        const display = document.getElementById("stopwatch");
-        display.textContent = this.formatMilliseconds(this.elapsedMilliseconds);
+    tick() {
+        this.updateDisplay();
+        this.frameId = requestAnimationFrame(() => this.tick());
     }
 
-    formatMilliseconds(milliseconds) {
-        const totalSeconds = Math.floor(milliseconds / 1000);
-        const hours = Math.floor(totalSeconds / 3600).toString().padStart(2, "0");
-        const minutes = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, "0");
-        const seconds = (totalSeconds % 60).toString().padStart(2, "0");
-        const remainingMilliseconds = Math.floor(milliseconds % 1000 / 100).toString();
+    updateDisplay() {
+        const text = formatStopwatch(this.elapsedMilliseconds);
+        // Runs every frame, but the DOM only changes when the shown tenth of a second does
+        if (this.display.textContent !== text) {
+            this.display.textContent = text;
+        }
+    }
 
-        return `${hours}:${minutes}:${seconds}.${remainingMilliseconds}`;
+    updateButton() {
+        this.toggleButton.textContent = this.isRunning ? PAUSE_ICON : PLAY_ICON;
+        setLabel(this.toggleButton, this.isRunning ? "Pause stopwatch" : "Start stopwatch");
     }
 }

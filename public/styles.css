@@ -1,41 +1,84 @@
-ul {
-    padding: 0;
+#currentTime,
+#stopwatch {
+    font-family: 'Fira Code', monospace;
+    /* Shrinks on narrow screens so the stopwatch and its buttons fit on one line */
+    font-size: min(3.3rem, 8.5vw);
 }
 
-li {
-    position: relative;
+.clock-button {
+    padding: 5px 20px;
+}
+
+/* Bootstrap stretches selects in an input group like the text input; keep this one only as wide as its text */
+#addPosition {
+    flex: 0 0 auto;
+    width: auto;
+}
+
+/* Bootstrap's list-group expects touching items and removes their top borders,
+   so restore full borders and rounded corners for the spaced-out task cards. */
+.task-list {
+    gap: 6px;
+}
+
+.task-list > .list-group-item {
+    border-top-width: var(--bs-list-group-border-width);
+    border-radius: var(--bs-border-radius);
+}
+
+.task {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
-    margin: 5px 0;
-    padding: 8px;
-    border: 1px solid #d1d3e2;
-    border-radius: 5px;
+    gap: 6px;
     font-size: 1.2rem;
 }
 
-li:hover {
-    background-color: #292929;
+/* Buttons and timer stay together on the right, and move to their own line when space runs out */
+.task-controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
 }
 
-li>* {
-    margin-right: 5px;
+.task:hover {
+    background-color: var(--bs-tertiary-bg);
 }
 
-li>*:last-child {
-    margin-right: 0;
+.drag-handle {
+    cursor: grab;
+    margin: 0 4px;
 }
 
-input[type="checkbox"] {
-    margin-right: 10px;
+.task-check {
+    margin-right: 4px;
 }
 
-.list-group-item {
-    margin-bottom: 1px;
+.task-name,
+.task-edit-input {
+    flex: 1 1 10rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
-.timestamp {
+.task-completed-at {
     font-size: 0.9rem;
+}
+
+.task-timer {
+    font-family: 'Fira Code', monospace;
+    font-size: 1.0rem;
+}
+
+.task-button {
+    padding: 5px 15px;
+}
+
+.mirror {
+    transform: scaleX(-1);
 }
 
 .delete-button {
@@ -44,7 +87,7 @@ input[type="checkbox"] {
     cursor: pointer;
     color: #dc3545;
     font-size: 1.0rem;
-    margin-left: 10px;
+    margin-left: 4px;
     transition: color 0.3s;
 }
 
@@ -52,27 +95,36 @@ input[type="checkbox"] {
     color: #a71d2a;
 }
 
-.timer-span {
-    font-size: 1.0rem;
+.timer-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
 }
 
-#currentTime,
-#stopwatch {
-    font-family: 'Fira Code', monospace;
-    font-size: 3.3rem;
+.timer-minutes {
+    width: 5.5rem;
 }
 
-#deleteAllButton {
-    margin-top: 20px;
+/* While the timer form is open it replaces the edit and timer buttons */
+.task.setting-timer [data-action="edit"],
+.task.setting-timer [data-action="timer"] {
+    display: none;
 }
 
-.drag-handle {
-    cursor: grab;
-    margin: 0 10px;
-    /* 0 for bottom and top, 10 for left and right */
+/* Completed tasks: crossed out, compact, no edit or timer controls */
+.task.completed {
+    padding-top: 2px;
+    padding-bottom: 2px;
 }
 
-.mirror {
-    transform: scaleX(-1);
-    display: inline-block;
+.task.completed .task-name {
+    text-decoration: line-through;
+    line-height: 1.25;
+}
+
+.task.completed [data-action="edit"],
+.task.completed [data-action="timer"],
+.task.completed .timer-form {
+    display: none;
 }
