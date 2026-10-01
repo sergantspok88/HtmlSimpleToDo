@@ -12,8 +12,9 @@ Simple ToDo list with a clock, a stopwatch and per-task countdown timers.
 - Timers run for a number of minutes, or until a time of day: type it in 24-hour form ("15:30", "1530", "15")
   or as "3pm", or pick one of the suggested half-hours. A time that has passed today means tomorrow.
   A running timer shows a progress bar on its task and its countdown in the browser tab title.
-- When a timer ends you get a sound (repeated until dismissed, configurable in Settings), a message with
-  "Mark done" and "Snooze 5 min" buttons and, if allowed, a desktop notification.
+- When a timer ends you get a sound, a message with "Mark done" and "Snooze 5 min" buttons and, if allowed,
+  a desktop notification. The sound plays once; tick "Repeat sound" when setting the timer to have it repeat
+  every few seconds until you dismiss the message (for up to a minute).
 - Follows the system light/dark theme.
 
 ## Run server

@@ -1,16 +1,10 @@
 import { exportTasks, readBackupFile } from './backup.js';
 import { plural, showAlert, showUndoToast } from './ui.js';
 
-// The Settings popover: repeating alarm sound, and backup export/import
-export function setupSettingsPanel({ tasks, settings }) {
+// The Settings popover: backup export/import (and a list of keyboard shortcuts, which needs no code)
+export function setupSettingsPanel({ tasks }) {
     const panel = document.getElementById("settingsPanel");
-    const repeatAlarmInput = document.getElementById("repeatAlarm");
     const importFile = document.getElementById("importFile");
-
-    repeatAlarmInput.checked = settings.current.repeatAlarm;
-    repeatAlarmInput.addEventListener("change", () => {
-        settings.update({ repeatAlarm: repeatAlarmInput.checked });
-    });
 
     document.getElementById("exportButton").addEventListener("click", () => exportTasks(tasks.all));
     document.getElementById("importButton").addEventListener("click", () => importFile.click());

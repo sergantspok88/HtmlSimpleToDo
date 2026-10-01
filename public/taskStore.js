@@ -4,6 +4,9 @@ import { createTask } from './storage.js';
 
 /** @typedef {import('./storage.js').Task} Task */
 
+// The timer fields of a task with no timer running
+const NO_TIMER = Object.freeze({ timerEndsAt: null, timerDuration: null, timerRepeat: false });
+
 /**
  * Holds the task list and every way of changing it. It knows nothing about the page: other modules
  * subscribe() to hear about changes, so the rules here can be tested without a browser.
@@ -32,16 +35,17 @@ export function createTaskStore(initialTasks) {
 
     /**
      * Starts a timer that ends at `endsAt` (epoch milliseconds), e.g. for a reminder at a time of day.
+     * `repeat` repeats the sound until the time's-up message is dismissed.
      * Returns false, and changes nothing, for a completed task or a time that isn't in the future.
      * @param {string} id
      * @param {number} endsAt
      */
-    function startTimerUntil(id, endsAt, now = Date.now()) {
+    function startTimerUntil(id, endsAt, { repeat = false, now = Date.now() } = {}) {
         const task = find(id);
         if (!task || task.done || !Number.isFinite(endsAt) || endsAt <= now) {
             return false;
         }
-        update(id, { timerEndsAt: endsAt, timerDuration: endsAt - now });
+        update(id, { timerEndsAt: endsAt, timerDuration: endsAt - now, timerRepeat: repeat });
         return true;
     }
 
@@ -84,40 +88,40 @@ export function createTaskStore(initialTasks) {
          */
         setDone(id, done, now = Date.now()) {
             if (done) {
-                update(id, { done: true, completedAt: now, timerEndsAt: null, timerDuration: null });
+                update(id, { done: true, completedAt: now, ...NO_TIMER });
             } else {
                 update(id, { done: false, completedAt: null });
             }
         },
 
         /**
-         * Starts a timer that runs for `minutes`. Returns false, and changes nothing,
-         * for a completed task or an invalid length.
+         * Starts a timer that runs for `minutes`. `repeat` repeats the sound until the time's-up message
+         * is dismissed. Returns false, and changes nothing, for a completed task or an invalid length.
          * @param {string} id
          * @param {number} minutes
          */
-        startTimer(id, minutes, now = Date.now()) {
-            return startTimerUntil(id, now + minutes * 60 * 1000, now);
+        startTimer(id, minutes, { repeat = false, now = Date.now() } = {}) {
+            return startTimerUntil(id, now + minutes * 60 * 1000, { repeat, now });
         },
 
         startTimerUntil,
 
         /** @param {string} id */
         stopTimer(id) {
-            update(id, { timerEndsAt: null, timerDuration: null });
+            update(id, NO_TIMER);
         },
 
-        /** Stops every timer that has run out, and returns those tasks. */
+        /** Stops every timer that has run out. Returns those tasks as they were just before, timer settings included. */
         finishDueTimers(now = Date.now()) {
             const dueTasks = tasks.filter((task) => task.timerEndsAt !== null && task.timerEndsAt <= now);
+            const before = dueTasks.map((task) => ({ ...task }));
             for (const task of dueTasks) {
-                task.timerEndsAt = null;
-                task.timerDuration = null;
+                Object.assign(task, NO_TIMER);
             }
             if (dueTasks.length > 0) {
                 changed();
             }
-            return dueTasks;
+            return before;
         },
 
         /**

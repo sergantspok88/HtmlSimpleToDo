@@ -110,18 +110,22 @@ export function createTaskList(section, { tasks, settings }) {
 
     // ---- Actions on a task ----
 
-    // Closes the row's timer form, then makes the store call in `start`
+    // Closes the row's timer form, then makes the store call in `start`, passing whether "Repeat sound"
+    // was ticked (read first, because closing the form clears it)
     function startTimer(row, start) {
+        const repeat = row.repeatChosen();
         row.closeTimerForm({ focusTimerButton: true });
         requestNotificationPermission();
-        start();
+        start(repeat);
     }
 
     // What each button with a data-action attribute does
     const actions = {
         edit: (row, task) => row.startEditing(task.text, (text) => tasks.rename(task.id, text)),
         timer: (row, task) => (task.timerEndsAt !== null ? tasks.stopTimer(task.id) : row.openTimerForm()),
-        preset: (row, task, button) => startTimer(row, () => tasks.startTimer(task.id, Number(button.dataset.minutes))),
+        preset: (row, task, button) => startTimer(row, (repeat) => {
+            tasks.startTimer(task.id, Number(button.dataset.minutes), { repeat });
+        }),
         "cancel-timer": (row) => row.closeTimerForm({ focusTimerButton: true }),
         delete: (row, task) => removeWithUndo(tasks, (t) => t.id === task.id, () => "Task deleted"),
     };
@@ -165,7 +169,7 @@ export function createTaskList(section, { tasks, settings }) {
         const now = Date.now();
         const endsAt = row?.chosenTimerEnd(now);
         if (task && endsAt) {
-            startTimer(row, () => tasks.startTimerUntil(task.id, endsAt, now));
+            startTimer(row, (repeat) => tasks.startTimerUntil(task.id, endsAt, { repeat, now }));
         }
     });
 

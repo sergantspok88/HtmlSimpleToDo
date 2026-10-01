@@ -7,7 +7,7 @@ const MAX_TIMEOUT = 2 ** 31 - 1;
 // Keeps a single timeout for the earliest running timer, and announces timers when they run out.
 // One timeout fires on time without polling, and because it is usually started from a user action,
 // browsers throttle it far less in background tabs than a repeating interval.
-export function startAlarmScheduler({ tasks, settings }) {
+export function startAlarmScheduler({ tasks }) {
     let timeoutId = 0;
 
     function schedule() {
@@ -30,9 +30,10 @@ export function startAlarmScheduler({ tasks, settings }) {
 
         for (const task of dueTasks) {
             announceTimeUp(task, {
-                repeatSound: settings.current.repeatAlarm,
+                repeatSound: task.timerRepeat,
                 onMarkDone: () => tasks.setDone(task.id, true),
-                onSnooze: () => tasks.startTimer(task.id, SNOOZE_MINUTES),
+                // A snoozed timer keeps its sound setting
+                onSnooze: () => tasks.startTimer(task.id, SNOOZE_MINUTES, { repeat: task.timerRepeat }),
             });
         }
     }

@@ -18,6 +18,7 @@ export class TaskRow {
         this.name = part(".task-name");
         this.completedAt = part(".task-completed-at");
         this.timer = part(".task-timer");
+        this.repeatIcon = part(".task-timer-repeat");
         this.progress = part(".task-progress");
         this.timerForm = part(".timer-form");
         this.timeHint = part(".timer-hint");
@@ -54,6 +55,7 @@ export class TaskRow {
         this.timerButton.querySelector(".bi").className = `bi ${timerRunning ? "bi-stop-circle" : "bi-stopwatch"}`;
         setLabel(this.timerButton, timerRunning ? "Stop timer" : "Start timer");
         this.timer.title = timerRunning ? `Ends ${formatUpcomingTime(task.timerEndsAt, new Date(now))}` : "";
+        this.repeatIcon.hidden = !(timerRunning && task.timerRepeat);
         if (task.done) {
             this.closeTimerForm();
         }
@@ -148,6 +150,11 @@ export class TaskRow {
         minutes.setCustomValidity("Enter the minutes, or a time of day");
         minutes.reportValidity();
         return null;
+    }
+
+    // Whether "Repeat sound" is ticked in the timer form
+    repeatChosen() {
+        return this.timerForm.elements.repeat.checked;
     }
 
     // "in 20 min" or "tomorrow, in 16 h 50 min" next to the time field, so it's clear when the timer would go off

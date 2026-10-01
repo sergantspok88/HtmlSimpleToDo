@@ -29,9 +29,9 @@ save(tasks.all); // also re-saves tasks loaded in the old format
 // The page
 const list = createTaskList(document.getElementById("tasks"), { tasks, settings });
 const tabTitle = createTabTitle({ tasks });
-startAlarmScheduler({ tasks, settings });
+startAlarmScheduler({ tasks });
 setupToolbar({ tasks, settings, list });
-setupSettingsPanel({ tasks, settings });
+setupSettingsPanel({ tasks });
 setupShortcuts({ tasks });
 
 startClock(document.getElementById("currentTime"), (now) => {

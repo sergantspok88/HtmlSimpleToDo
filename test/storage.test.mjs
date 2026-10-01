@@ -22,7 +22,7 @@ test("loadTasks converts the old { name, checked } format", () => {
     ]);
     for (const task of tasks) {
         assert.equal(typeof task.id, "string");
-        assert.deepEqual([task.completedAt, task.timerEndsAt, task.timerDuration], [null, null, null]);
+        assert.deepEqual([task.completedAt, task.timerEndsAt, task.timerDuration, task.timerRepeat], [null, null, null, false]);
     }
 });
 
@@ -34,9 +34,17 @@ test("loadTasks returns an empty list for missing or unreadable data", (t) => {
 });
 
 test("saved tasks load back unchanged", () => {
-    const tasks = [{ id: "a", text: "Task", done: true, completedAt: 1, timerEndsAt: null, timerDuration: null }];
+    const tasks = [
+        { id: "a", text: "Task", done: true, completedAt: 1, timerEndsAt: null, timerDuration: null, timerRepeat: false },
+        { id: "b", text: "Timer", done: false, completedAt: null, timerEndsAt: 5000, timerDuration: 4000, timerRepeat: true },
+    ];
     assert.equal(saveTasks(tasks), true);
     assert.deepEqual(loadTasks(), tasks);
+});
+
+test("tasks saved before the repeat option load with a single sound", () => {
+    items.set("tasks", JSON.stringify([{ id: "a", text: "Timer", done: false, timerEndsAt: 5000, timerDuration: 4000 }]));
+    assert.equal(loadTasks()[0].timerRepeat, false);
 });
 
 test("parseBackup accepts an exported file or a plain list of tasks", () => {
@@ -69,8 +77,8 @@ test("parseBackup gives duplicate ids a new id", () => {
 });
 
 test("loadSettings uses defaults for missing or invalid values", () => {
-    assert.deepEqual(loadSettings(), { addPosition: "top", showCompleted: true, repeatAlarm: true });
+    assert.deepEqual(loadSettings(), { addPosition: "top", showCompleted: true });
 
-    items.set("settings", JSON.stringify({ addPosition: "sideways", showCompleted: "yes", repeatAlarm: false }));
-    assert.deepEqual(loadSettings(), { addPosition: "top", showCompleted: true, repeatAlarm: false });
+    items.set("settings", JSON.stringify({ addPosition: "sideways", showCompleted: "yes", repeatAlarm: true }));
+    assert.deepEqual(loadSettings(), { addPosition: "top", showCompleted: true }); // settings that no longer exist are dropped
 });

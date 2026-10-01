@@ -94,11 +94,6 @@
             <button type="button" class="btn-close" popovertarget="settingsPanel" popovertargetaction="hide" aria-label="Close"></button>
         </div>
 
-        <div class="form-check form-switch mb-4">
-            <input class="form-check-input" type="checkbox" role="switch" id="repeatAlarm">
-            <label class="form-check-label" for="repeatAlarm">Repeat the timer sound until dismissed (for up to a minute)</label>
-        </div>
-
         <h3 class="h6">Backup</h3>
         <p class="small text-body-secondary mb-2">Tasks are stored only in this browser. Export them to keep a copy or to move them to another browser. Importing replaces the current tasks (you can undo it).</p>
         <div class="d-flex gap-2 mb-4">
@@ -140,8 +135,14 @@
             <label class="task-name"></label>
             <div class="task-controls">
                 <small class="task-completed-at"></small>
+                <i class="bi bi-repeat task-timer-repeat" role="img" aria-label="Sound repeats" title="The sound will repeat until you dismiss the message" hidden></i>
                 <span class="task-timer"></span>
                 <form class="timer-form" hidden>
+                    <!-- First, since the preset buttons start the timer straight away -->
+                    <label class="form-check timer-repeat" title="Repeat the sound every few seconds until you dismiss the message (for up to a minute)">
+                        <input type="checkbox" name="repeat" class="form-check-input">
+                        <span class="form-check-label"><i class="bi bi-repeat" aria-hidden="true"></i> Repeat sound</span>
+                    </label>
                     <div class="btn-group btn-group-sm" role="group" aria-label="Preset timers">
                         <button type="button" class="btn btn-outline-secondary" data-action="preset" data-minutes="5" aria-label="Start 5 minute timer">5m</button>
                         <button type="button" class="btn btn-outline-secondary" data-action="preset" data-minutes="15" aria-label="Start 15 minute timer">15m</button>

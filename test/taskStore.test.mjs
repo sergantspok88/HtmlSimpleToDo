@@ -3,8 +3,10 @@ import assert from "node:assert/strict";
 import { createTaskStore } from "../public/taskStore.js";
 
 const task = (id, fields = {}) => ({
-    id, text: id, done: false, completedAt: null, timerEndsAt: null, timerDuration: null, ...fields,
+    id, text: id, done: false, completedAt: null, timerEndsAt: null, timerDuration: null, timerRepeat: false, ...fields,
 });
+const timerOf = ({ timerEndsAt, timerDuration, timerRepeat }) => ({ timerEndsAt, timerDuration, timerRepeat });
+const NO_TIMER = { timerEndsAt: null, timerDuration: null, timerRepeat: false };
 const storeWith = (...ids) => createTaskStore(ids.map((id) => task(id)));
 const texts = (store) => store.all.map((t) => t.text);
 
@@ -27,10 +29,11 @@ test("subscribers are told about every change until they unsubscribe", () => {
 });
 
 test("completing a task records when, and stops its timer", () => {
-    const store = createTaskStore([task("a", { timerEndsAt: 5000, timerDuration: 1000 })]);
+    const store = createTaskStore([task("a", { timerEndsAt: 5000, timerDuration: 1000, timerRepeat: true })]);
     store.setDone("a", true, 1234);
-    const { done, completedAt, timerEndsAt, timerDuration } = store.find("a");
-    assert.deepEqual({ done, completedAt, timerEndsAt, timerDuration }, { done: true, completedAt: 1234, timerEndsAt: null, timerDuration: null });
+    assert.equal(store.find("a").done, true);
+    assert.equal(store.find("a").completedAt, 1234);
+    assert.deepEqual(timerOf(store.find("a")), NO_TIMER);
 
     store.setDone("a", false);
     assert.equal(store.find("a").done, false);
@@ -46,18 +49,29 @@ test("startTimer refuses completed tasks and invalid lengths", () => {
     assert.equal(store.startTimer("missing", 5), false);
     assert.equal(store.find("a").timerEndsAt, null);
 
-    assert.equal(store.startTimer("a", 1.5, 1000), true);
-    assert.equal(store.find("a").timerEndsAt, 1000 + 90_000);
-    assert.equal(store.find("a").timerDuration, 90_000);
+    assert.equal(store.startTimer("a", 1.5, { now: 1000 }), true);
+    assert.deepEqual(timerOf(store.find("a")), { timerEndsAt: 1000 + 90_000, timerDuration: 90_000, timerRepeat: false });
+});
+
+test("a timer plays its sound once unless asked to repeat it", () => {
+    const store = storeWith("a");
+    store.startTimer("a", 5, { repeat: true });
+    assert.equal(store.find("a").timerRepeat, true);
+
+    store.stopTimer("a");
+    assert.deepEqual(timerOf(store.find("a")), NO_TIMER);
+
+    store.startTimer("a", 5);
+    assert.equal(store.find("a").timerRepeat, false);
 });
 
 test("startTimerUntil sets a timer ending at a given time, for reminders", () => {
     const store = createTaskStore([task("a"), task("done", { done: true })]);
-    assert.equal(store.startTimerUntil("a", 1000, 1000), false); // not in the future
-    assert.equal(store.startTimerUntil("a", NaN, 1000), false);
-    assert.equal(store.startTimerUntil("done", 5000, 1000), false);
+    assert.equal(store.startTimerUntil("a", 1000, { now: 1000 }), false); // not in the future
+    assert.equal(store.startTimerUntil("a", NaN, { now: 1000 }), false);
+    assert.equal(store.startTimerUntil("done", 5000, { now: 1000 }), false);
 
-    assert.equal(store.startTimerUntil("a", 7_201_000, 1000), true);
+    assert.equal(store.startTimerUntil("a", 7_201_000, { now: 1000 }), true);
     assert.equal(store.find("a").timerEndsAt, 7_201_000);
     assert.equal(store.find("a").timerDuration, 7_200_000);
 });
@@ -71,6 +85,13 @@ test("finishDueTimers stops and returns only the timers that have run out", () =
     assert.deepEqual(due.map((t) => t.id), ["due"]);
     assert.equal(store.find("due").timerEndsAt, null);
     assert.equal(store.find("later").timerEndsAt, 9000);
+});
+
+test("finishDueTimers returns the timer settings from before they were cleared", () => {
+    const store = createTaskStore([task("a", { timerEndsAt: 1000, timerDuration: 500, timerRepeat: true })]);
+    const [due] = store.finishDueTimers(2000);
+    assert.equal(due.timerRepeat, true); // so the alarm knows to repeat the sound
+    assert.deepEqual(timerOf(store.find("a")), NO_TIMER);
 });
 
 test("finishDueTimers doesn't notify when nothing was due", () => {

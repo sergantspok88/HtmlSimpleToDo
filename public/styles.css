@@ -211,6 +211,29 @@ body {
     width: 5.5rem;
 }
 
+/* Bootstrap lays out checkboxes for stacked forms; line this one up with the buttons beside it */
+.timer-repeat {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.timer-repeat .form-check-input {
+    float: none;
+    margin: 0;
+}
+
+.task-timer-repeat {
+    font-size: 0.9rem;
+    color: var(--bs-secondary-color);
+}
+
 .timer-or,
 .timer-hint {
     font-size: 0.9rem;

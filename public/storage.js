@@ -9,13 +9,13 @@
  * @property {number | null} completedAt epoch milliseconds
  * @property {number | null} timerEndsAt epoch milliseconds, null when no timer is running
  * @property {number | null} timerDuration milliseconds, for the progress bar
+ * @property {boolean} timerRepeat repeat the sound until the time's-up message is dismissed
  */
 
 /**
  * @typedef {object} Settings
  * @property {"top" | "bottom"} addPosition where new tasks go
  * @property {boolean} showCompleted whether the completed section is expanded
- * @property {boolean} repeatAlarm repeat the timer sound until the message is dismissed
  */
 
 export const STORAGE_KEY = "tasks";
@@ -25,7 +25,6 @@ const SETTINGS_KEY = "settings";
 const DEFAULT_SETTINGS = {
     addPosition: "top",
     showCompleted: true,
-    repeatAlarm: true,
 };
 
 /** @returns {Settings} */
@@ -66,6 +65,7 @@ export function createTask(text) {
         completedAt: null,
         timerEndsAt: null,
         timerDuration: null,
+        timerRepeat: false,
     };
 }
 
@@ -110,6 +110,7 @@ export function parseBackup(data) {
         if (task.timerEndsAt !== null && task.timerEndsAt <= now) {
             task.timerEndsAt = null;
             task.timerDuration = null;
+            task.timerRepeat = false;
         }
     }
     return tasks;
@@ -157,6 +158,7 @@ function normalizeTask(saved) {
         completedAt: Number.isFinite(saved.completedAt) ? saved.completedAt : null,
         timerEndsAt,
         timerDuration: timerEndsAt !== null && Number.isFinite(saved.timerDuration) ? saved.timerDuration : null,
+        timerRepeat: timerEndsAt !== null && saved.timerRepeat === true,
     };
 }
 
