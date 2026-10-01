@@ -1,19 +1,36 @@
+// @ts-check
+
+/**
+ * A task as kept in memory, in localStorage and in backup files.
+ * @typedef {object} Task
+ * @property {string} id
+ * @property {string} text
+ * @property {boolean} done
+ * @property {number | null} completedAt epoch milliseconds
+ * @property {number | null} timerEndsAt epoch milliseconds, null when no timer is running
+ * @property {number | null} timerDuration milliseconds, for the progress bar
+ */
+
+/**
+ * @typedef {object} Settings
+ * @property {"top" | "bottom"} addPosition where new tasks go
+ * @property {boolean} showCompleted whether the completed section is expanded
+ * @property {boolean} repeatAlarm repeat the timer sound until the message is dismissed
+ */
+
 export const STORAGE_KEY = "tasks";
 const SETTINGS_KEY = "settings";
 
+/** @type {Settings} */
 const DEFAULT_SETTINGS = {
-    addPosition: "top", // where new tasks go: "top" or "bottom"
-    showCompleted: true, // whether the completed section is expanded
-    repeatAlarm: true, // repeat the timer sound until the message is dismissed
+    addPosition: "top",
+    showCompleted: true,
+    repeatAlarm: true,
 };
 
+/** @returns {Settings} */
 export function loadSettings() {
-    let saved;
-    try {
-        saved = JSON.parse(localStorage.getItem(SETTINGS_KEY));
-    } catch (error) {
-        console.error("Could not read saved settings", error);
-    }
+    const saved = readJson(SETTINGS_KEY);
 
     // Use saved values only when they have the right type, so a bad value falls back to the default
     const settings = { ...DEFAULT_SETTINGS };
@@ -28,6 +45,7 @@ export function loadSettings() {
     return settings;
 }
 
+/** @param {Settings} settings */
 export function saveSettings(settings) {
     try {
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
@@ -36,30 +54,31 @@ export function saveSettings(settings) {
     }
 }
 
-// A task as kept in memory and in localStorage
+/**
+ * @param {string} text
+ * @returns {Task}
+ */
 export function createTask(text) {
     return {
         id: createId(),
         text,
         done: false,
-        completedAt: null, // epoch milliseconds
-        timerEndsAt: null, // epoch milliseconds, null when no timer is running
-        timerDuration: null, // milliseconds, for the progress bar
+        completedAt: null,
+        timerEndsAt: null,
+        timerDuration: null,
     };
 }
 
+/** @returns {Task[]} */
 export function loadTasks() {
-    let saved;
-    try {
-        saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    } catch (error) {
-        console.error("Could not read saved tasks", error);
-        return [];
-    }
+    const saved = readJson(STORAGE_KEY);
     return Array.isArray(saved) ? normalizeTasks(saved) : [];
 }
 
-// Returns false when the browser refuses to store data (storage disabled or full)
+/**
+ * Returns false when the browser refuses to store data (storage disabled or full).
+ * @param {readonly Task[]} tasks
+ */
 export function saveTasks(tasks) {
     try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
@@ -70,9 +89,13 @@ export function saveTasks(tasks) {
     }
 }
 
-// Reads an exported backup ({ tasks: [...] }) or a plain list of tasks. Returns null if it is neither.
+/**
+ * Reads an exported backup ({ tasks: [...] }) or a plain list of tasks. Returns null if it is neither.
+ * @param {unknown} data parsed JSON
+ * @returns {Task[] | null}
+ */
 export function parseBackup(data) {
-    const saved = Array.isArray(data) ? data : data?.tasks;
+    const saved = Array.isArray(data) ? data : /** @type {any} */ (data)?.tasks;
     if (!Array.isArray(saved)) {
         return null;
     }
@@ -92,6 +115,20 @@ export function parseBackup(data) {
     return tasks;
 }
 
+// Parsed JSON from localStorage; null when missing, undefined when unreadable or storage is unavailable
+function readJson(key) {
+    try {
+        return JSON.parse(localStorage.getItem(key) ?? "null");
+    } catch (error) {
+        console.error(`Could not read saved ${key}`, error);
+        return undefined;
+    }
+}
+
+/**
+ * @param {any[]} saved
+ * @returns {Task[]}
+ */
 function normalizeTasks(saved) {
     const seenIds = new Set();
     return saved
@@ -106,7 +143,11 @@ function normalizeTasks(saved) {
         });
 }
 
-// Earlier versions saved only { name, checked }, so fill in anything missing
+/**
+ * Earlier versions saved only { name, checked }, so fill in anything missing.
+ * @param {any} saved
+ * @returns {Task}
+ */
 function normalizeTask(saved) {
     const timerEndsAt = Number.isFinite(saved.timerEndsAt) ? saved.timerEndsAt : null;
     return {

@@ -37,3 +37,43 @@ Files in `public/` are served straight from disk, so changes to them only need a
 On Windows you can also double-click `start_project.bat`.
 
 To start the server automatically in the background, without a console window, see [docs/run-in-background.md](docs/run-in-background.md).
+
+## Tests
+
+```sh
+npm test
+```
+
+Runs the unit tests in `test/` with Node's built-in test runner. They cover the task rules, saving and loading,
+backups and time formatting. The page itself isn't covered, so check changes to it in the browser.
+
+## Code structure
+
+All app code is in `public/` as plain ES modules, with no build step.
+
+Data and rules (no page code, unit tested, type-checked in VS Code through `// @ts-check`):
+
+| File | Purpose |
+|---|---|
+| `taskStore.js` | The task list and every way of changing it. Other modules `subscribe()` to hear about changes. |
+| `settingsStore.js` | The settings; `update()` saves them and notifies subscribers. |
+| `storage.js` | Reading and writing `localStorage`, converting old data, reading backups. Defines the `Task` and `Settings` types. |
+| `time.js` | Time formatting. |
+| `listeners.js` | The small subscribe/notify helper the stores use. |
+
+The page:
+
+| File | Purpose |
+|---|---|
+| `main.js` | Creates the stores and connects the modules below. Start reading here. |
+| `taskList.js` | Draws the active and completed lists and handles everything done to a task in them. |
+| `taskRow.js` | One task's row: updating it, editing the name, the timer form. |
+| `toolbar.js` | Add form, top/bottom setting, filter buttons, Delete All. |
+| `settingsPanel.js`, `backup.js` | The Settings popover, and export/import of backup files. |
+| `alarmScheduler.js`, `alarm.js` | When timers run out, and the sound, message and notification that follow. |
+| `clock.js`, `tabTitle.js`, `stopwatch.js` | Clock, countdown in the tab title, stopwatch. |
+| `shortcuts.js` | Keyboard shortcuts. |
+| `ui.js` | Shared helpers: messages, the Undo message, button labels. |
+
+To add a feature, give it its own module that takes the stores, subscribes to the changes it cares about,
+and is set up in `main.js`.

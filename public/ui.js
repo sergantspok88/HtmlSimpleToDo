@@ -1,10 +1,22 @@
 const UNDO_TIMEOUT_MS = 8000;
 let hideToastTimeoutId = 0;
 
+// "1 task", "3 tasks"
+export const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
+
 // Accessible name for screen readers plus a hover tooltip, for icon-only buttons
 export function setLabel(element, text) {
     element.setAttribute("aria-label", text);
     element.title = text;
+}
+
+// Removes tasks through the task store and shows an Undo message for them.
+// `describe` turns the number removed into the message.
+export function removeWithUndo(tasks, shouldRemove, describe) {
+    const { count, undo } = tasks.remove(shouldRemove);
+    if (count > 0) {
+        showUndoToast(describe(count), undo);
+    }
 }
 
 // Dismissible message at the top of the page, optionally with action buttons that also close it.
