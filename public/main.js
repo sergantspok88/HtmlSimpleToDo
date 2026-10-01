@@ -1,36 +1,48 @@
 import Sortable from './vendor/sortablejs/sortable.esm.js';
 import { Stopwatch } from './stopwatch.js';
-import { formatClock, formatCountdown } from './time.js';
-import { STORAGE_KEY, createTask, loadSettings, loadTasks, saveSettings, saveTasks } from './storage.js';
+import { formatClock, formatCompletedTime, formatCountdown, formatIsoDate } from './time.js';
+import { STORAGE_KEY, createTask, loadSettings, loadTasks, parseBackup, saveSettings, saveTasks } from './storage.js';
 import { announceTimeUp, requestNotificationPermission } from './alarm.js';
-import { setLabel, showAlert } from './ui.js';
+import { setLabel, showAlert, showUndoToast } from './ui.js';
 
-const TIMER_ICON = "⏲";
-const STOP_ICON = "⏹";
+const SNOOZE_MINUTES = 5;
 // Longer setTimeout delays overflow and fire immediately
 const MAX_TIMEOUT = 2 ** 31 - 1;
+const BASE_TITLE = document.title;
 
-const taskList = document.getElementById("taskList");
+const tasksSection = document.getElementById("tasks");
+const activeList = document.getElementById("activeList");
+const completedSection = document.getElementById("completedSection");
+const completedList = document.getElementById("completedList");
+const completedToggle = document.getElementById("completedToggle");
+const completedCount = document.getElementById("completedCount");
+const emptyState = document.getElementById("emptyState");
 const taskTemplate = document.getElementById("taskTemplate");
 const taskInput = document.getElementById("taskInput");
 const addPositionSelect = document.getElementById("addPosition");
 const clearCompletedButton = document.getElementById("clearCompletedButton");
 const deleteAllButton = document.getElementById("deleteAllButton");
 const currentTime = document.getElementById("currentTime");
+const settingsPanel = document.getElementById("settingsPanel");
+const repeatAlarmInput = document.getElementById("repeatAlarm");
+const importFile = document.getElementById("importFile");
 
 // `tasks` is the single source of truth: change it, then call commit() to save and redraw
 let tasks = loadTasks();
 const settings = loadSettings();
+let filter = "all"; // "all", "active" or "done"
 const taskElements = new Map(); // task id -> <li>
 let alarmTimeoutId = 0;
 let saveFailureShown = false;
+
+const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
 
 // ---- Changing tasks ----
 
 function commit() {
     if (!saveTasks(tasks) && !saveFailureShown) {
         saveFailureShown = true;
-        showAlert("Tasks could not be saved, so they will be lost when this page is closed.", "danger");
+        showAlert("Tasks could not be saved, so they will be lost when this page is closed.", { variant: "danger" });
     }
     render();
     scheduleAlarm();
@@ -58,33 +70,79 @@ function updateTask(id, changes) {
     }
 }
 
-function removeTasks(shouldRemove) {
+// Removes tasks, then offers to bring them back. `describe` turns the count into a message.
+function removeTasks(shouldRemove, describe) {
+    const removed = [];
+    tasks.forEach((task, index) => {
+        if (shouldRemove(task)) {
+            removed.push({ task, index });
+        }
+    });
+    if (removed.length === 0) {
+        return;
+    }
+
     tasks = tasks.filter((task) => !shouldRemove(task));
     commit();
+    showUndoToast(describe(removed.length), () => {
+        // Put each task back where it was; going from the lowest position up keeps the later ones right
+        for (const { task, index } of removed) {
+            if (!findTask(task.id)) {
+                tasks.splice(Math.min(index, tasks.length), 0, task);
+            }
+        }
+        commit();
+    });
 }
 
 function setDone(id, done) {
     // Completing a task also stops its timer
     if (done) {
-        updateTask(id, { done: true, completedAt: Date.now(), timerEndsAt: null });
+        updateTask(id, { done: true, completedAt: Date.now(), timerEndsAt: null, timerDuration: null });
     } else {
         updateTask(id, { done: false, completedAt: null });
     }
 }
 
 function startTimer(id, minutes) {
-    if (!Number.isFinite(minutes) || minutes <= 0) {
+    const task = findTask(id);
+    if (!task || task.done || !Number.isFinite(minutes) || minutes <= 0) {
         return;
     }
     requestNotificationPermission();
-    updateTask(id, { timerEndsAt: Date.now() + minutes * 60 * 1000 });
+    const duration = minutes * 60 * 1000;
+    updateTask(id, { timerEndsAt: Date.now() + duration, timerDuration: duration });
+}
+
+function stopTimer(id) {
+    updateTask(id, { timerEndsAt: null, timerDuration: null });
+}
+
+// Swaps an active task with the active task above (-1) or below (+1) it
+function moveTask(id, direction) {
+    const activeTasks = tasks.filter((task) => !task.done);
+    const index = activeTasks.findIndex((task) => task.id === id);
+    const neighbor = activeTasks[index + direction];
+    if (index === -1 || !neighbor) {
+        return;
+    }
+    const from = tasks.indexOf(activeTasks[index]);
+    const to = tasks.indexOf(neighbor);
+    [tasks[from], tasks[to]] = [tasks[to], tasks[from]];
+    commit();
 }
 
 // ---- Rendering ----
 
-// Updates the existing <li> elements in place instead of rebuilding the list,
+// Updates the existing <li> elements in place instead of rebuilding the lists,
 // so an edit in progress or an open timer form isn't thrown away
 function render() {
+    const activeTasks = tasks.filter((task) => !task.done);
+    // Most recently completed first; tasks completed before completion times were saved go last
+    const doneTasks = tasks
+        .filter((task) => task.done)
+        .sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0));
+
     const ids = new Set(tasks.map((task) => task.id));
     for (const [id, li] of taskElements) {
         if (!ids.has(id)) {
@@ -92,8 +150,45 @@ function render() {
             taskElements.delete(id);
         }
     }
+    placeTasks(activeList, activeTasks);
+    placeTasks(completedList, doneTasks);
 
-    tasks.forEach((task, index) => {
+    activeList.hidden = filter === "done";
+    completedSection.hidden = filter === "active" || doneTasks.length === 0;
+    completedList.hidden = !settings.showCompleted;
+    completedToggle.setAttribute("aria-expanded", String(settings.showCompleted));
+    completedCount.textContent = doneTasks.length;
+
+    document.querySelector('[data-count="all"]').textContent = tasks.length;
+    document.querySelector('[data-count="active"]').textContent = activeTasks.length;
+    document.querySelector('[data-count="done"]').textContent = doneTasks.length;
+
+    let emptyMessage = "";
+    if (tasks.length === 0) {
+        emptyMessage = "No tasks yet. Add one above.";
+    } else if (filter === "done" && doneTasks.length === 0) {
+        emptyMessage = "No completed tasks yet.";
+    } else if (filter !== "done" && activeTasks.length === 0) {
+        emptyMessage = "Nothing left to do.";
+    }
+    emptyState.textContent = emptyMessage;
+    emptyState.hidden = !emptyMessage;
+
+    deleteAllButton.disabled = tasks.length === 0;
+    updateTitle(Date.now());
+}
+
+// Puts the elements for `listTasks` into `list`, in order
+function placeTasks(list, listTasks) {
+    // Take out tasks that now belong in the other list first, so they don't throw off the positions below
+    const ids = new Set(listTasks.map((task) => task.id));
+    for (const li of [...list.children]) {
+        if (!ids.has(li.dataset.id)) {
+            li.remove();
+        }
+    }
+
+    listTasks.forEach((task, index) => {
         let li = taskElements.get(task.id);
         if (!li) {
             li = createTaskElement(task.id);
@@ -102,14 +197,11 @@ function render() {
         updateTaskElement(li, task);
 
         // Only move elements that are out of place, since moving one takes focus away from it
-        const current = taskList.children[index];
+        const current = list.children[index];
         if (current !== li) {
-            taskList.insertBefore(li, current ?? null);
+            list.insertBefore(li, current ?? null);
         }
     });
-
-    clearCompletedButton.disabled = !tasks.some((task) => task.done);
-    deleteAllButton.disabled = tasks.length === 0;
 }
 
 function createTaskElement(id) {
@@ -126,13 +218,15 @@ function updateTaskElement(li, task) {
     li.classList.toggle("completed", task.done);
     li.querySelector(".task-check").checked = task.done;
     li.querySelector(".task-name").textContent = task.text;
-    li.querySelector(".task-completed-at").textContent = task.done && task.completedAt
-        ? `Completed at ${new Date(task.completedAt).toLocaleString()}`
-        : "";
+
+    const completedAt = li.querySelector(".task-completed-at");
+    const hasCompletedAt = task.done && task.completedAt !== null;
+    completedAt.textContent = hasCompletedAt ? `done ${formatCompletedTime(task.completedAt)}` : "";
+    completedAt.title = hasCompletedAt ? new Date(task.completedAt).toLocaleString() : "";
 
     const timerRunning = task.timerEndsAt !== null;
     const timerButton = li.querySelector('[data-action="timer"]');
-    timerButton.textContent = timerRunning ? STOP_ICON : TIMER_ICON;
+    timerButton.querySelector(".bi").className = `bi ${timerRunning ? "bi-stop-circle" : "bi-stopwatch"}`;
     setLabel(timerButton, timerRunning ? "Stop timer" : "Start timer");
     if (task.done) {
         closeTimerForm(li);
@@ -140,14 +234,37 @@ function updateTaskElement(li, task) {
     updateCountdown(li, task, Date.now());
 }
 
+function remainingSeconds(task, now) {
+    return Math.max(0, Math.ceil((task.timerEndsAt - now) / 1000));
+}
+
 function updateCountdown(li, task, now) {
     const timer = li.querySelector(".task-timer");
+    const progress = li.querySelector(".task-progress");
     if (task.timerEndsAt === null) {
         timer.textContent = "";
-    } else {
-        const remainingSeconds = Math.max(0, Math.ceil((task.timerEndsAt - now) / 1000));
-        timer.textContent = formatCountdown(remainingSeconds);
+        progress.hidden = true;
+        return;
     }
+
+    timer.textContent = formatCountdown(remainingSeconds(task, now));
+    // Timers saved before durations were stored have no progress bar
+    progress.hidden = !task.timerDuration;
+    if (task.timerDuration) {
+        const elapsed = 1 - (task.timerEndsAt - now) / task.timerDuration;
+        progress.style.width = `${Math.min(Math.max(elapsed, 0), 1) * 100}%`;
+    }
+}
+
+// Shows the timer that ends first in the tab title, so it can be seen from other tabs
+function updateTitle(now) {
+    const runningTasks = tasks.filter((task) => task.timerEndsAt !== null);
+    if (runningTasks.length === 0) {
+        document.title = BASE_TITLE;
+        return;
+    }
+    const next = runningTasks.reduce((soonest, task) => (task.timerEndsAt < soonest.timerEndsAt ? task : soonest));
+    document.title = `⏲ ${formatCountdown(remainingSeconds(next, now))} · ${BASE_TITLE}`;
 }
 
 // ---- Editing ----
@@ -239,9 +356,17 @@ function finishDueTimers() {
     const dueTasks = tasks.filter((task) => task.timerEndsAt !== null && task.timerEndsAt <= now);
     dueTasks.forEach((task) => {
         task.timerEndsAt = null;
+        task.timerDuration = null;
     });
     commit(); // also schedules the next timer, if any
-    dueTasks.forEach(announceTimeUp);
+
+    for (const task of dueTasks) {
+        announceTimeUp(task, {
+            repeatSound: settings.repeatAlarm,
+            onMarkDone: () => setDone(task.id, true),
+            onSnooze: () => startTimer(task.id, SNOOZE_MINUTES),
+        });
+    }
 }
 
 // ---- Clock ----
@@ -255,7 +380,47 @@ function updateEverySecond() {
             updateCountdown(taskElements.get(task.id), task, now.getTime());
         }
     }
+    updateTitle(now.getTime());
     setTimeout(updateEverySecond, 1000 - now.getMilliseconds());
+}
+
+// ---- Backup ----
+
+function exportTasks() {
+    const backup = { app: "html-simple-todo", version: 1, exportedAt: new Date().toISOString(), tasks };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `todo-backup-${formatIsoDate(new Date())}.json`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    // Some browsers read the file after click() returns, so release it a little later
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function importTasks(file) {
+    let imported = null;
+    try {
+        imported = parseBackup(JSON.parse(await file.text()));
+    } catch (error) {
+        console.warn("Could not read backup", error);
+    }
+    if (!imported) {
+        showAlert(`"${file.name}" isn't a ToDo backup file.`, { variant: "danger" });
+        return;
+    }
+
+    const previousTasks = tasks;
+    tasks = imported;
+    commit();
+    settingsPanel.hidePopover?.();
+    showUndoToast(`Imported ${plural(imported.length, "task")}`, () => {
+        tasks = previousTasks;
+        commit();
+    });
 }
 
 // ---- Event handlers ----
@@ -275,8 +440,19 @@ addPositionSelect.addEventListener("change", () => {
     saveSettings(settings);
 });
 
-// One set of listeners on the list handles every task, including ones added later
-taskList.addEventListener("click", (event) => {
+for (const input of document.querySelectorAll('input[name="filter"]')) {
+    input.addEventListener("change", () => {
+        filter = input.value;
+        if (filter === "done" && !settings.showCompleted) {
+            settings.showCompleted = true;
+            saveSettings(settings);
+        }
+        render();
+    });
+}
+
+// One set of listeners on the task section handles every task in both lists, including ones added later
+tasksSection.addEventListener("click", (event) => {
     const button = event.target.closest("button[data-action]");
     if (!button) {
         return;
@@ -290,7 +466,7 @@ taskList.addEventListener("click", (event) => {
             break;
         case "timer":
             if (findTask(id)?.timerEndsAt) {
-                updateTask(id, { timerEndsAt: null });
+                stopTimer(id);
             } else {
                 openTimerForm(li);
             }
@@ -302,48 +478,98 @@ taskList.addEventListener("click", (event) => {
             closeTimerForm(li, { focusTimerButton: true });
             break;
         case "delete":
-            removeTasks((task) => task.id === id);
+            removeTasks((task) => task.id === id, () => "Task deleted");
             break;
     }
 });
 
-taskList.addEventListener("change", (event) => {
-    if (event.target.matches(".task-check")) {
-        setDone(event.target.closest(".task").dataset.id, event.target.checked);
+tasksSection.addEventListener("change", (event) => {
+    if (!event.target.matches(".task-check")) {
+        return;
+    }
+    const li = event.target.closest(".task");
+    const neighbor = li.nextElementSibling ?? li.previousElementSibling;
+    setDone(li.dataset.id, event.target.checked);
+
+    // The task moved to the other list, which takes focus away; keep keyboard users near where they were
+    if (document.activeElement === document.body) {
+        neighbor?.querySelector(".task-check").focus();
     }
 });
 
 // The browser only fires "submit" once the minutes field passes its required/min/max checks
-taskList.addEventListener("submit", (event) => {
+tasksSection.addEventListener("submit", (event) => {
     event.preventDefault();
     const form = event.target;
     submitTimer(form.closest(".task"), form.elements.minutes.valueAsNumber);
 });
 
-taskList.addEventListener("keydown", (event) => {
+tasksSection.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && event.target.closest(".timer-form")) {
         closeTimerForm(event.target.closest(".task"), { focusTimerButton: true });
     }
 });
 
+completedToggle.addEventListener("click", () => {
+    settings.showCompleted = !settings.showCompleted;
+    saveSettings(settings);
+    render();
+});
+
 clearCompletedButton.addEventListener("click", () => {
-    removeTasks((task) => task.done);
+    removeTasks((task) => task.done, (count) => `Cleared ${plural(count, "completed task")}`);
 });
 
 deleteAllButton.addEventListener("click", () => {
-    const count = tasks.length;
-    if (confirm(`Delete all ${count} task${count === 1 ? "" : "s"}? This cannot be undone.`)) {
-        removeTasks(() => true);
+    removeTasks(() => true, (count) => `Deleted ${plural(count, "task")}`);
+});
+
+repeatAlarmInput.checked = settings.repeatAlarm;
+repeatAlarmInput.addEventListener("change", () => {
+    settings.repeatAlarm = repeatAlarmInput.checked;
+    saveSettings(settings);
+});
+
+document.getElementById("exportButton").addEventListener("click", exportTasks);
+document.getElementById("importButton").addEventListener("click", () => importFile.click());
+importFile.addEventListener("change", () => {
+    const file = importFile.files[0];
+    importFile.value = ""; // so choosing the same file again still triggers "change"
+    if (file) {
+        importTasks(file);
     }
 });
 
-Sortable.create(taskList, {
+// Keyboard shortcuts: N or / to type a new task, Alt+Up/Down to move the focused task
+document.addEventListener("keydown", (event) => {
+    const target = event.target;
+
+    if (event.altKey && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
+        const li = target.closest?.("#activeList > .task");
+        if (li && !target.matches(".task-edit-input")) {
+            event.preventDefault();
+            moveTask(li.dataset.id, event.key === "ArrowUp" ? -1 : 1);
+            target.focus(); // moving the element takes focus away from it
+        }
+        return;
+    }
+
+    const isShortcut = event.key === "n" || event.key === "N" || event.key === "/";
+    const isTyping = target.matches?.("input:not([type='checkbox'], [type='radio']), textarea, select, [contenteditable]");
+    if (isShortcut && !event.ctrlKey && !event.metaKey && !event.altKey && !isTyping) {
+        event.preventDefault();
+        taskInput.focus();
+    }
+});
+
+Sortable.create(activeList, {
     animation: 150,
     handle: ".drag-handle",
     // Fires after a drag changed the order. Sortable has already moved the element, so read the order back.
     onUpdate: () => {
-        const order = [...taskList.children].map((li) => li.dataset.id);
-        tasks.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+        const tasksById = new Map(tasks.map((task) => [task.id, task]));
+        const reordered = [...activeList.children].map((li) => tasksById.get(li.dataset.id)).filter(Boolean);
+        tasks = [...reordered, ...tasks.filter((task) => task.done)];
         commit();
     },
 });

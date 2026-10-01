@@ -9,6 +9,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Serve third-party libraries from node_modules, so the app works without internet access
 const vendor = (dir) => express.static(path.join(__dirname, 'node_modules', dir));
 app.use('/vendor/bootstrap', vendor('bootstrap/dist/css'));
+app.use('/vendor/bootstrap-icons', vendor('bootstrap-icons/font'));
 app.use('/vendor/sortablejs', vendor('sortablejs/modular'));
 app.use('/vendor/fira-code', vendor('@fontsource/fira-code'));
 

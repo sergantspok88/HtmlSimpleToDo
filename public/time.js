@@ -19,3 +19,29 @@ export function formatStopwatch(milliseconds) {
 export function formatCountdown(totalSeconds) {
     return `${pad(Math.floor(totalSeconds / 60))}:${pad(totalSeconds % 60)}`;
 }
+
+// Short completion time: "20:03" today, "yesterday 20:03", "Sep 28" this year, "Sep 28, 2025" before that.
+// Times are 24-hour, like the clock.
+export function formatCompletedTime(timestamp, now = new Date()) {
+    const date = new Date(timestamp);
+    const time = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    if (date.toDateString() === now.toDateString()) {
+        return time;
+    }
+
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    if (date.toDateString() === yesterday.toDateString()) {
+        return `yesterday ${time}`;
+    }
+
+    const options = date.getFullYear() === now.getFullYear()
+        ? { month: "short", day: "numeric" }
+        : { year: "numeric", month: "short", day: "numeric" };
+    return date.toLocaleDateString([], options);
+}
+
+// Local date as yyyy-mm-dd, e.g. for file names
+export function formatIsoDate(date) {
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}

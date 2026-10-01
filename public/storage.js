@@ -3,6 +3,8 @@ const SETTINGS_KEY = "settings";
 
 const DEFAULT_SETTINGS = {
     addPosition: "top", // where new tasks go: "top" or "bottom"
+    showCompleted: true, // whether the completed section is expanded
+    repeatAlarm: true, // repeat the timer sound until the message is dismissed
 };
 
 export function loadSettings() {
@@ -13,7 +15,13 @@ export function loadSettings() {
         console.error("Could not read saved settings", error);
     }
 
-    const settings = { ...DEFAULT_SETTINGS, ...saved };
+    // Use saved values only when they have the right type, so a bad value falls back to the default
+    const settings = { ...DEFAULT_SETTINGS };
+    for (const key of Object.keys(DEFAULT_SETTINGS)) {
+        if (typeof saved?.[key] === typeof DEFAULT_SETTINGS[key]) {
+            settings[key] = saved[key];
+        }
+    }
     if (!["top", "bottom"].includes(settings.addPosition)) {
         settings.addPosition = DEFAULT_SETTINGS.addPosition;
     }
@@ -36,6 +44,7 @@ export function createTask(text) {
         done: false,
         completedAt: null, // epoch milliseconds
         timerEndsAt: null, // epoch milliseconds, null when no timer is running
+        timerDuration: null, // milliseconds, for the progress bar
     };
 }
 
@@ -47,11 +56,7 @@ export function loadTasks() {
         console.error("Could not read saved tasks", error);
         return [];
     }
-
-    if (!Array.isArray(saved)) {
-        return [];
-    }
-    return saved.filter((task) => typeof (task?.text ?? task?.name) === "string").map(normalizeTask);
+    return Array.isArray(saved) ? normalizeTasks(saved) : [];
 }
 
 // Returns false when the browser refuses to store data (storage disabled or full)
@@ -65,14 +70,52 @@ export function saveTasks(tasks) {
     }
 }
 
+// Reads an exported backup ({ tasks: [...] }) or a plain list of tasks. Returns null if it is neither.
+export function parseBackup(data) {
+    const saved = Array.isArray(data) ? data : data?.tasks;
+    if (!Array.isArray(saved)) {
+        return null;
+    }
+    const tasks = normalizeTasks(saved);
+    if (saved.length > 0 && tasks.length === 0) {
+        return null;
+    }
+
+    // Timers that ran out after the backup was made would all go off at once, so drop them
+    const now = Date.now();
+    for (const task of tasks) {
+        if (task.timerEndsAt !== null && task.timerEndsAt <= now) {
+            task.timerEndsAt = null;
+            task.timerDuration = null;
+        }
+    }
+    return tasks;
+}
+
+function normalizeTasks(saved) {
+    const seenIds = new Set();
+    return saved
+        .filter((task) => typeof (task?.text ?? task?.name) === "string")
+        .map((task) => {
+            const normalized = normalizeTask(task);
+            if (seenIds.has(normalized.id)) {
+                normalized.id = createId();
+            }
+            seenIds.add(normalized.id);
+            return normalized;
+        });
+}
+
 // Earlier versions saved only { name, checked }, so fill in anything missing
 function normalizeTask(saved) {
+    const timerEndsAt = Number.isFinite(saved.timerEndsAt) ? saved.timerEndsAt : null;
     return {
         id: typeof saved.id === "string" ? saved.id : createId(),
         text: saved.text ?? saved.name,
         done: Boolean(saved.done ?? saved.checked),
         completedAt: Number.isFinite(saved.completedAt) ? saved.completedAt : null,
-        timerEndsAt: Number.isFinite(saved.timerEndsAt) ? saved.timerEndsAt : null,
+        timerEndsAt,
+        timerDuration: timerEndsAt !== null && Number.isFinite(saved.timerDuration) ? saved.timerDuration : null,
     };
 }
 

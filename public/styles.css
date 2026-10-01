@@ -1,8 +1,33 @@
-#currentTime,
-#stopwatch {
+/* Room at the bottom so the undo message doesn't cover the last buttons */
+body {
+    padding-bottom: 4.5rem;
+}
+
+/* Buttons inside a message take the message's own text color, so they're readable in both themes */
+.alert-action {
+    --bs-btn-color: inherit;
+    --bs-btn-border-color: currentColor;
+    --bs-btn-hover-color: inherit;
+    --bs-btn-hover-bg: color-mix(in srgb, currentColor 15%, transparent);
+    --bs-btn-hover-border-color: currentColor;
+    --bs-btn-active-color: inherit;
+    --bs-btn-active-bg: color-mix(in srgb, currentColor 25%, transparent);
+    --bs-btn-active-border-color: currentColor;
+}
+
+/* ---- Header ---- */
+
+/* Shrinks on narrow screens so the stopwatch and its buttons fit on one line */
+.clock,
+.stopwatch {
     font-family: 'Fira Code', monospace;
-    /* Shrinks on narrow screens so the stopwatch and its buttons fit on one line */
     font-size: min(3.3rem, 8.5vw);
+    line-height: 1.2;
+}
+
+/* Slightly quieter color than the stopwatch */
+.clock {
+    color: var(--bs-secondary-color);
 }
 
 .clock-button {
@@ -15,6 +40,13 @@
     width: auto;
 }
 
+.filter-count {
+    margin-left: 2px;
+    opacity: 0.7;
+}
+
+/* ---- Task lists ---- */
+
 /* Bootstrap's list-group expects touching items and removes their top borders,
    so restore full borders and rounded corners for the spaced-out task cards. */
 .task-list {
@@ -26,12 +58,68 @@
     border-radius: var(--bs-border-radius);
 }
 
+.empty-state {
+    margin: 2rem 0;
+    text-align: center;
+    color: var(--bs-secondary-color);
+}
+
+.section-link {
+    --bs-btn-color: var(--bs-secondary-color);
+    --bs-btn-hover-color: var(--bs-emphasis-color);
+    --bs-btn-active-color: var(--bs-emphasis-color);
+    text-decoration: none;
+}
+
+.completed-toggle {
+    padding-left: 0;
+}
+
+.completed-toggle .bi {
+    display: inline-block;
+    transition: transform 0.15s;
+}
+
+.completed-toggle[aria-expanded="false"] .bi {
+    transform: rotate(-90deg);
+}
+
+/* ---- Task rows ---- */
+
 .task {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 6px;
     font-size: 1.2rem;
+}
+
+.task:hover {
+    background-color: var(--bs-tertiary-bg);
+}
+
+.drag-handle {
+    cursor: grab;
+    color: var(--bs-secondary-color);
+}
+
+/* Completed tasks are ordered by completion time, so they can't be dragged */
+#completedList .drag-handle {
+    display: none;
+}
+
+.task-check {
+    flex-shrink: 0;
+    width: 1.1em;
+    height: 1.1em;
+    margin: 0 4px 0 0;
+}
+
+.task-name,
+.task-edit-input {
+    flex: 1 1 10rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 /* Buttons and timer stay together on the right, and move to their own line when space runs out */
@@ -44,28 +132,9 @@
     margin-left: auto;
 }
 
-.task:hover {
-    background-color: var(--bs-tertiary-bg);
-}
-
-.drag-handle {
-    cursor: grab;
-    margin: 0 4px;
-}
-
-.task-check {
-    margin-right: 4px;
-}
-
-.task-name,
-.task-edit-input {
-    flex: 1 1 10rem;
-    min-width: 0;
-    overflow-wrap: anywhere;
-}
-
 .task-completed-at {
     font-size: 0.9rem;
+    color: var(--bs-secondary-color);
 }
 
 .task-timer {
@@ -73,26 +142,52 @@
     font-size: 1.0rem;
 }
 
-.task-button {
-    padding: 5px 15px;
+.task-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
 }
 
-.mirror {
-    transform: scaleX(-1);
+/* Quiet, borderless buttons for the actions on each row */
+.icon-button {
+    --bs-btn-padding-x: 0.45rem;
+    --bs-btn-padding-y: 0.15rem;
+    --bs-btn-border-width: 0;
+    --bs-btn-color: var(--bs-secondary-color);
+    --bs-btn-hover-color: var(--bs-emphasis-color);
+    --bs-btn-hover-bg: var(--bs-secondary-bg);
+    --bs-btn-active-color: var(--bs-emphasis-color);
+    --bs-btn-active-bg: var(--bs-secondary-bg);
 }
 
-.delete-button {
-    background-color: transparent;
-    border: none;
-    cursor: pointer;
-    color: #dc3545;
-    font-size: 1.0rem;
-    margin-left: 4px;
-    transition: color 0.3s;
+.icon-button-danger {
+    --bs-btn-hover-color: var(--bs-danger);
+    --bs-btn-active-color: var(--bs-danger);
 }
 
-.delete-button:hover {
-    color: #a71d2a;
+/* With a mouse, show a row's actions only while it is hovered or has keyboard focus.
+   Touch screens can't hover, so they always show them. */
+@media (hover: hover) {
+    .task-actions {
+        opacity: 0;
+        transition: opacity 0.15s;
+    }
+
+    .task:hover .task-actions,
+    .task:focus-within .task-actions {
+        opacity: 1;
+    }
+}
+
+/* Thin bar along the bottom of a row with a running timer */
+.task-progress {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 3px;
+    background-color: var(--bs-primary);
+    border-bottom-left-radius: inherit;
+    transition: width 1s linear;
 }
 
 .timer-form {
@@ -112,7 +207,7 @@
     display: none;
 }
 
-/* Completed tasks: crossed out, compact, no edit or timer controls */
+/* Completed tasks: crossed out, dimmed, compact, no edit or timer controls */
 .task.completed {
     padding-top: 2px;
     padding-bottom: 2px;
@@ -120,6 +215,7 @@
 
 .task.completed .task-name {
     text-decoration: line-through;
+    color: var(--bs-secondary-color);
     line-height: 1.25;
 }
 
@@ -127,4 +223,35 @@
 .task.completed [data-action="timer"],
 .task.completed .timer-form {
     display: none;
+}
+
+/* ---- Settings ---- */
+
+.settings-panel {
+    width: min(26rem, calc(100vw - 2rem));
+    padding: 1.25rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius-lg);
+    background-color: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    box-shadow: var(--bs-box-shadow-lg);
+}
+
+.settings-panel::backdrop {
+    background-color: rgb(0 0 0 / 0.4);
+}
+
+.shortcuts {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.4rem 1rem;
+    margin: 0;
+}
+
+.shortcuts dt {
+    font-weight: normal;
+}
+
+.shortcuts dd {
+    margin: 0;
 }

@@ -5,8 +5,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+    <script>
+        // Follow the system light/dark setting. Bootstrap reads the theme from an attribute,
+        // so set it before the page is drawn to avoid a flash of the wrong theme.
+        {
+            const darkQuery = matchMedia("(prefers-color-scheme: dark)");
+            const applyTheme = () => {
+                document.documentElement.dataset.bsTheme = darkQuery.matches ? "dark" : "light";
+            };
+            applyTheme();
+            darkQuery.addEventListener("change", applyTheme);
+        }
+    </script>
+
     <link rel="icon" href="favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="vendor/bootstrap/bootstrap.min.css">
+    <link rel="stylesheet" href="vendor/bootstrap-icons/bootstrap-icons.min.css">
     <link rel="stylesheet" href="vendor/fira-code/400.css">
     <link rel="stylesheet" href="styles.css">
 
@@ -18,11 +32,11 @@
 <body>
     <div class="container-fluid mt-3">
         <header class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-            <time id="currentTime" class="display-4"></time>
+            <time id="currentTime" class="clock"></time>
             <div class="d-flex align-items-center gap-2">
-                <time id="stopwatch" class="display-4">00:00:00.0</time>
-                <button class="btn btn-primary clock-button" id="startPause" type="button" aria-label="Start stopwatch" title="Start stopwatch">&#x23F5;</button>
-                <button class="btn btn-danger clock-button" id="reset" type="button" aria-label="Reset stopwatch" title="Reset stopwatch">&#x23F9;</button>
+                <time id="stopwatch" class="stopwatch">00:00:00.0</time>
+                <button class="btn btn-primary clock-button" id="startPause" type="button" aria-label="Start stopwatch" title="Start stopwatch"><i class="bi bi-play-fill" aria-hidden="true"></i></button>
+                <button class="btn btn-danger clock-button" id="reset" type="button" aria-label="Reset stopwatch" title="Reset stopwatch"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i></button>
             </div>
         </header>
 
@@ -37,19 +51,81 @@
             </select>
         </form>
 
-        <ul id="taskList" class="list-group task-list">
-        </ul>
+        <div class="btn-group btn-group-sm mb-3" role="group" aria-label="Show tasks">
+            <input type="radio" class="btn-check" name="filter" id="filterAll" value="all" checked>
+            <label class="btn btn-outline-secondary" for="filterAll">All <span class="filter-count" data-count="all"></span></label>
+            <input type="radio" class="btn-check" name="filter" id="filterActive" value="active">
+            <label class="btn btn-outline-secondary" for="filterActive">Active <span class="filter-count" data-count="active"></span></label>
+            <input type="radio" class="btn-check" name="filter" id="filterDone" value="done">
+            <label class="btn btn-outline-secondary" for="filterDone">Done <span class="filter-count" data-count="done"></span></label>
+        </div>
 
-        <div class="d-flex justify-content-end gap-2 my-3">
-            <button class="btn btn-outline-secondary" id="clearCompletedButton" type="button">Clear Completed</button>
-            <button class="btn btn-danger" id="deleteAllButton" type="button">Delete All</button>
+        <section id="tasks">
+            <ul id="activeList" class="list-group task-list"></ul>
+
+            <p id="emptyState" class="empty-state" hidden></p>
+
+            <div id="completedSection" class="mt-3" hidden>
+                <div class="d-flex align-items-center justify-content-between">
+                    <button id="completedToggle" class="btn btn-link section-link completed-toggle" type="button" aria-controls="completedList" aria-expanded="true">
+                        <i class="bi bi-chevron-down" aria-hidden="true"></i> Completed (<span id="completedCount">0</span>)
+                    </button>
+                    <button id="clearCompletedButton" class="btn btn-link btn-sm section-link" type="button">Clear completed</button>
+                </div>
+                <ul id="completedList" class="list-group task-list"></ul>
+            </div>
+        </section>
+
+        <footer class="d-flex justify-content-between align-items-center gap-2 my-3">
+            <button class="btn btn-outline-secondary" type="button" popovertarget="settingsPanel"><i class="bi bi-gear" aria-hidden="true"></i> Settings</button>
+            <button class="btn btn-outline-danger" id="deleteAllButton" type="button">Delete All</button>
+        </footer>
+    </div>
+
+    <div id="settingsPanel" class="settings-panel" popover>
+        <div class="d-flex align-items-center justify-content-between mb-3">
+            <h2 class="h5 m-0">Settings</h2>
+            <button type="button" class="btn-close" popovertarget="settingsPanel" popovertargetaction="hide" aria-label="Close"></button>
+        </div>
+
+        <div class="form-check form-switch mb-4">
+            <input class="form-check-input" type="checkbox" role="switch" id="repeatAlarm">
+            <label class="form-check-label" for="repeatAlarm">Repeat the timer sound until dismissed (for up to a minute)</label>
+        </div>
+
+        <h3 class="h6">Backup</h3>
+        <p class="small text-body-secondary mb-2">Tasks are stored only in this browser. Export them to keep a copy or to move them to another browser. Importing replaces the current tasks (you can undo it).</p>
+        <div class="d-flex gap-2 mb-4">
+            <button id="exportButton" class="btn btn-sm btn-outline-secondary" type="button"><i class="bi bi-download" aria-hidden="true"></i> Export</button>
+            <button id="importButton" class="btn btn-sm btn-outline-secondary" type="button"><i class="bi bi-upload" aria-hidden="true"></i> Import</button>
+            <input id="importFile" type="file" accept=".json,application/json" hidden>
+        </div>
+
+        <h3 class="h6">Keyboard</h3>
+        <dl class="shortcuts small">
+            <dt><kbd>N</kbd> or <kbd>/</kbd></dt>
+            <dd>Type a new task</dd>
+            <dt><kbd>Alt</kbd> + <kbd>&uarr;</kbd> / <kbd>&darr;</kbd></dt>
+            <dd>Move the focused task up or down</dd>
+            <dt><kbd>Enter</kbd> / <kbd>Esc</kbd></dt>
+            <dd>Save or cancel an edit</dd>
+        </dl>
+    </div>
+
+    <div class="toast-container position-fixed bottom-0 start-50 translate-middle-x p-3" role="status" aria-live="polite">
+        <div id="undoToast" class="toast">
+            <div class="d-flex align-items-center">
+                <div class="toast-body toast-message"></div>
+                <button type="button" class="btn btn-link btn-sm undo-button">Undo</button>
+                <button type="button" class="btn-close me-2" aria-label="Close"></button>
+            </div>
         </div>
     </div>
 
     <template id="taskTemplate">
         <li class="list-group-item task">
-            <span class="drag-handle" title="Drag to reorder" aria-hidden="true">&#9776;</span>
-            <input type="checkbox" class="task-check">
+            <span class="drag-handle" title="Drag to reorder (or Alt+&uarr;/&darr;)" aria-hidden="true"><i class="bi bi-grip-vertical"></i></span>
+            <input type="checkbox" class="form-check-input task-check">
             <label class="task-name"></label>
             <div class="task-controls">
                 <small class="task-completed-at"></small>
@@ -64,10 +140,13 @@
                     <button type="submit" class="btn btn-primary btn-sm">Start</button>
                     <button type="button" class="btn btn-outline-secondary btn-sm" data-action="cancel-timer">Cancel</button>
                 </form>
-                <button type="button" class="btn btn-secondary btn-sm task-button mirror" data-action="edit" aria-label="Edit task" title="Edit task">&#9998;</button>
-                <button type="button" class="btn btn-secondary btn-sm task-button" data-action="timer"></button>
-                <button type="button" class="delete-button" data-action="delete" aria-label="Delete task" title="Delete task">X</button>
+                <div class="task-actions">
+                    <button type="button" class="btn icon-button" data-action="edit" aria-label="Edit task" title="Edit task"><i class="bi bi-pencil" aria-hidden="true"></i></button>
+                    <button type="button" class="btn icon-button" data-action="timer"><i class="bi bi-stopwatch" aria-hidden="true"></i></button>
+                    <button type="button" class="btn icon-button icon-button-danger" data-action="delete" aria-label="Delete task" title="Delete task"><i class="bi bi-trash3" aria-hidden="true"></i></button>
+                </div>
             </div>
+            <span class="task-progress" aria-hidden="true" hidden></span>
         </li>
     </template>
 </body>

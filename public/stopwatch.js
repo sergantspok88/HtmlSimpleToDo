@@ -1,8 +1,8 @@
 import { formatStopwatch } from './time.js';
 import { setLabel } from './ui.js';
 
-const PLAY_ICON = "⏵";
-const PAUSE_ICON = "⏸";
+const PLAY_ICON = "bi-play-fill";
+const PAUSE_ICON = "bi-pause-fill";
 
 export class Stopwatch {
     constructor(display, toggleButton) {
@@ -72,7 +72,7 @@ export class Stopwatch {
     }
 
     updateButton() {
-        this.toggleButton.textContent = this.isRunning ? PAUSE_ICON : PLAY_ICON;
+        this.toggleButton.querySelector(".bi").className = `bi ${this.isRunning ? PAUSE_ICON : PLAY_ICON}`;
         setLabel(this.toggleButton, this.isRunning ? "Pause stopwatch" : "Start stopwatch");
     }
 }
