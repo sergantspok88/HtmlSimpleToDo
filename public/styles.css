@@ -45,6 +45,10 @@ body {
     opacity: 0.7;
 }
 
+.search-box {
+    width: min(16rem, 100%);
+}
+
 /* ---- Task lists ---- */
 
 /* Bootstrap's list-group expects touching items and removes their top borders,
@@ -120,6 +124,12 @@ body {
     flex: 1 1 10rem;
     min-width: 0;
     overflow-wrap: anywhere;
+}
+
+/* Search match. Bootstrap pads <mark>, which would split the word apart. */
+.task-name mark {
+    padding: 0;
+    border-radius: 2px;
 }
 
 /* Buttons and timer stay together on the right, and move to their own line when space runs out */
@@ -199,6 +209,20 @@ body {
 
 .timer-minutes {
     width: 5.5rem;
+}
+
+.timer-or,
+.timer-hint {
+    font-size: 0.9rem;
+    color: var(--bs-secondary-color);
+}
+
+.timer-hint:empty {
+    display: none;
+}
+
+.timer-at {
+    width: 6.5rem;
 }
 
 /* While the timer form is open it replaces the edit and timer buttons */

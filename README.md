@@ -5,10 +5,13 @@ Simple ToDo list with a clock, a stopwatch and per-task countdown timers.
 - Tasks are saved in the browser's `localStorage` on every change, including completion times and running timers.
   Use Settings → Backup to export them to a file or import them again.
 - New tasks go to the top or the bottom of the list; pick which with the dropdown next to "Add" (remembered per browser).
-- Completed tasks move to a collapsible "Completed" section. Filter the list with All / Active / Done.
-- Reorder tasks by dragging the grip handle, or with Alt+↑/↓ on the focused task. Press N or / to type a new task.
+- Completed tasks move to a collapsible "Completed" section. Filter the list with All / Active / Done,
+  or search it (press /).
+- Reorder tasks by dragging the grip handle, or with Alt+↑/↓ on the focused task. Press N to type a new task.
 - Deleting or clearing tasks can be undone from the message at the bottom of the page.
-- A running timer shows a progress bar on its task and its countdown in the browser tab title.
+- Timers run for a number of minutes, or until a time of day: type it in 24-hour form ("15:30", "1530", "15")
+  or as "3pm", or pick one of the suggested half-hours. A time that has passed today means tomorrow.
+  A running timer shows a progress bar on its task and its countdown in the browser tab title.
 - When a timer ends you get a sound (repeated until dismissed, configurable in Settings), a message with
   "Mark done" and "Snooze 5 min" buttons and, if allowed, a desktop notification.
 - Follows the system light/dark theme.

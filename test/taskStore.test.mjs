@@ -51,6 +51,17 @@ test("startTimer refuses completed tasks and invalid lengths", () => {
     assert.equal(store.find("a").timerDuration, 90_000);
 });
 
+test("startTimerUntil sets a timer ending at a given time, for reminders", () => {
+    const store = createTaskStore([task("a"), task("done", { done: true })]);
+    assert.equal(store.startTimerUntil("a", 1000, 1000), false); // not in the future
+    assert.equal(store.startTimerUntil("a", NaN, 1000), false);
+    assert.equal(store.startTimerUntil("done", 5000, 1000), false);
+
+    assert.equal(store.startTimerUntil("a", 7_201_000, 1000), true);
+    assert.equal(store.find("a").timerEndsAt, 7_201_000);
+    assert.equal(store.find("a").timerDuration, 7_200_000);
+});
+
 test("finishDueTimers stops and returns only the timers that have run out", () => {
     const store = createTaskStore([
         task("due", { timerEndsAt: 1000, timerDuration: 500 }),
@@ -94,25 +105,26 @@ test("removing nothing reports a count of 0", () => {
     assert.equal(store.remove(() => false).count, 0);
 });
 
-test("move swaps with the next active task, skipping completed ones", () => {
-    const store = createTaskStore([task("a"), task("done", { done: true }), task("b")]);
-    store.move("a", 1);
-    assert.deepEqual(texts(store), ["b", "done", "a"]);
+test("swap exchanges two tasks and leaves the ones between them alone", () => {
+    const store = storeWith("a", "b", "c");
+    store.swap("a", "c");
+    assert.deepEqual(texts(store), ["c", "b", "a"]);
 
-    store.move("a", 1); // already the last active task
-    assert.deepEqual(texts(store), ["b", "done", "a"]);
+    store.swap("a", "missing");
+    assert.deepEqual(texts(store), ["c", "b", "a"]);
 });
 
-test("reorderActive puts active tasks in the given order, completed ones after", () => {
+test("reorderActive puts active tasks in the given order, completed ones stay put", () => {
     const store = createTaskStore([task("a"), task("done", { done: true }), task("b"), task("c")]);
     store.reorderActive(["c", "a", "b"]);
-    assert.deepEqual(texts(store), ["c", "a", "b", "done"]);
+    assert.deepEqual(texts(store), ["c", "done", "a", "b"]);
 });
 
-test("reorderActive keeps active tasks that were left out of the order", () => {
-    const store = storeWith("a", "b", "c");
-    store.reorderActive(["c"]);
-    assert.deepEqual(texts(store), ["c", "a", "b"]);
+test("reorderActive on a filtered list only moves the tasks that were shown", () => {
+    // As when a search shows only b and d, and d is dragged above b
+    const store = storeWith("a", "b", "c", "d");
+    store.reorderActive(["d", "b"]);
+    assert.deepEqual(texts(store), ["a", "d", "c", "b"]);
 });
 
 test("replaceAll can be undone", () => {

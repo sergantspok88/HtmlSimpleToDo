@@ -1,7 +1,11 @@
-import { formatCompletedTime, formatCountdown, secondsUntil } from './time.js';
+import {
+    formatCompletedTime, formatCountdown, formatDuration, formatTimeOfDay, formatUpcomingTime, isSameDay,
+    nextTimeOfDay, parseTimeOfDay, secondsUntil, upcomingRoundTimes,
+} from './time.js';
 import { setLabel } from './ui.js';
 
 const template = document.getElementById("taskTemplate");
+const timeSuggestions = document.getElementById("timeSuggestions");
 
 // One task's <li>. It looks up its parts once, and update() keeps them in line with the task.
 export class TaskRow {
@@ -16,17 +20,31 @@ export class TaskRow {
         this.timer = part(".task-timer");
         this.progress = part(".task-progress");
         this.timerForm = part(".timer-form");
+        this.timeHint = part(".timer-hint");
         this.editButton = part('[data-action="edit"]');
         this.timerButton = part('[data-action="timer"]');
 
         this.checkbox.id = `task-${id}`;
         this.name.htmlFor = this.checkbox.id;
+
+        // The timer form takes either a number of minutes or a time of day, so filling in one clears the other
+        const { minutes, at } = this.timerForm.elements;
+        minutes.addEventListener("input", () => {
+            at.value = "";
+            this.resetTimerFormMessages();
+        });
+        at.addEventListener("input", () => {
+            minutes.value = "";
+            this.resetTimerFormMessages();
+            this.showTimeHint();
+        });
     }
 
-    update(task, now = Date.now()) {
+    // `highlight` is the search pattern (a RegExp) to mark in the name, if any
+    update(task, { highlight = null, now = Date.now() } = {}) {
         this.element.classList.toggle("completed", task.done);
         this.checkbox.checked = task.done;
-        this.name.textContent = task.text;
+        this.showName(task.text, highlight);
 
         const hasCompletedAt = task.done && task.completedAt !== null;
         this.completedAt.textContent = hasCompletedAt ? `done ${formatCompletedTime(task.completedAt)}` : "";
@@ -35,10 +53,22 @@ export class TaskRow {
         const timerRunning = task.timerEndsAt !== null;
         this.timerButton.querySelector(".bi").className = `bi ${timerRunning ? "bi-stop-circle" : "bi-stopwatch"}`;
         setLabel(this.timerButton, timerRunning ? "Stop timer" : "Start timer");
+        this.timer.title = timerRunning ? `Ends ${formatUpcomingTime(task.timerEndsAt, new Date(now))}` : "";
         if (task.done) {
             this.closeTimerForm();
         }
         this.updateCountdown(task, now);
+    }
+
+    showName(text, highlight) {
+        const match = highlight?.exec(text);
+        if (!match) {
+            this.name.textContent = text;
+            return;
+        }
+        const mark = document.createElement("mark");
+        mark.textContent = match[0];
+        this.name.replaceChildren(text.slice(0, match.index), mark, text.slice(match.index + match[0].length));
     }
 
     updateCountdown(task, now) {
@@ -99,7 +129,48 @@ export class TaskRow {
         input.addEventListener("blur", () => finish(true));
     }
 
+    // When the timer chosen in the form should end, in epoch milliseconds. If nothing usable was entered,
+    // shows a message on the form and returns null.
+    chosenTimerEnd(now = Date.now()) {
+        const { minutes, at } = this.timerForm.elements;
+        if (at.value.trim()) {
+            const time = parseTimeOfDay(at.value);
+            if (!time) {
+                at.setCustomValidity("Enter a time like 15:30");
+                at.reportValidity();
+                return null;
+            }
+            return nextTimeOfDay(time.hours, time.minutes, new Date(now));
+        }
+        if (minutes.value) {
+            return now + minutes.valueAsNumber * 60 * 1000;
+        }
+        minutes.setCustomValidity("Enter the minutes, or a time of day");
+        minutes.reportValidity();
+        return null;
+    }
+
+    // "in 20 min" or "tomorrow, in 16 h 50 min" next to the time field, so it's clear when the timer would go off
+    showTimeHint(now = new Date()) {
+        const time = parseTimeOfDay(this.timerForm.elements.at.value);
+        if (!time) {
+            this.timeHint.textContent = "";
+            return;
+        }
+        const endsAt = nextTimeOfDay(time.hours, time.minutes, now);
+        const day = isSameDay(new Date(endsAt), now) ? "" : "tomorrow, ";
+        this.timeHint.textContent = `${day}in ${formatDuration(endsAt - now.getTime())}`;
+    }
+
+    resetTimerFormMessages() {
+        const { minutes, at } = this.timerForm.elements;
+        minutes.setCustomValidity("");
+        at.setCustomValidity("");
+        this.timeHint.textContent = "";
+    }
+
     openTimerForm() {
+        fillTimeSuggestions();
         this.element.classList.add("setting-timer");
         this.timerForm.hidden = false;
         this.timerForm.elements.minutes.focus();
@@ -112,8 +183,21 @@ export class TaskRow {
         this.element.classList.remove("setting-timer");
         this.timerForm.hidden = true;
         this.timerForm.reset();
+        this.resetTimerFormMessages();
         if (focusTimerButton) {
             this.timerButton.focus();
         }
     }
+}
+
+// Fills the shared suggestions list under the time fields with the next round half-hours,
+// each labelled with how far away it is, e.g. "23:30 · in 50 min"
+function fillTimeSuggestions(now = new Date()) {
+    const options = upcomingRoundTimes(now).map((time) => {
+        const option = document.createElement("option");
+        option.value = formatTimeOfDay(new Date(time));
+        option.label = `in ${formatDuration(time - now.getTime())}`;
+        return option;
+    });
+    timeSuggestions.replaceChildren(...options);
 }

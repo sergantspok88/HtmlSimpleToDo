@@ -15,6 +15,7 @@ export function createTaskList(section, { tasks, settings }) {
 
     const rows = new Map(); // task id -> TaskRow
     let filter = "all"; // "all", "active" or "done"
+    let search = ""; // text the task names must contain, ignoring case
 
     // ---- Drawing ----
 
@@ -22,15 +23,17 @@ export function createTaskList(section, { tasks, settings }) {
     // so an edit in progress or an open timer form isn't thrown away
     function render() {
         const allTasks = tasks.all;
-        const activeTasks = allTasks.filter((task) => !task.done);
+        const pattern = search ? new RegExp(escapeRegExp(search), "i") : null;
+        const shown = allTasks.filter((task) => !pattern || pattern.test(task.text));
+        const activeTasks = shown.filter((task) => !task.done);
         // Most recently completed first; tasks completed before completion times were saved go last
-        const doneTasks = allTasks
+        const doneTasks = shown
             .filter((task) => task.done)
             .sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0));
 
         removeDeletedRows(allTasks);
-        placeRows(activeList, activeTasks);
-        placeRows(completedList, doneTasks);
+        placeRows(activeList, activeTasks, pattern);
+        placeRows(completedList, doneTasks, pattern);
 
         activeList.hidden = filter === "done";
         completedSection.hidden = filter === "active" || doneTasks.length === 0;
@@ -38,7 +41,11 @@ export function createTaskList(section, { tasks, settings }) {
         completedToggle.setAttribute("aria-expanded", String(settings.current.showCompleted));
         completedCount.textContent = doneTasks.length;
 
-        const message = emptyMessage(allTasks.length, activeTasks.length, doneTasks.length);
+        const message = emptyMessage(
+            allTasks.length,
+            filter === "done" ? 0 : activeTasks.length,
+            filter === "active" ? 0 : doneTasks.length,
+        );
         emptyState.textContent = message;
         emptyState.hidden = !message;
     }
@@ -53,8 +60,8 @@ export function createTaskList(section, { tasks, settings }) {
         }
     }
 
-    // Puts the rows for `listTasks` into `list`, in order
-    function placeRows(list, listTasks) {
+    // Puts the rows for `listTasks` into `list`, in order. Rows left out stay in `rows` for later.
+    function placeRows(list, listTasks, highlight) {
         // Take out rows that now belong in the other list first, so they don't throw off the positions below
         const ids = new Set(listTasks.map((task) => task.id));
         for (const li of [...list.children]) {
@@ -69,7 +76,7 @@ export function createTaskList(section, { tasks, settings }) {
                 row = new TaskRow(task.id);
                 rows.set(task.id, row);
             }
-            row.update(task);
+            row.update(task, { highlight });
 
             // Only move rows that are out of place, since moving one takes focus away from it
             const current = list.children[index];
@@ -79,17 +86,18 @@ export function createTaskList(section, { tasks, settings }) {
         });
     }
 
-    function emptyMessage(total, activeCount, doneCount) {
+    // Counts are of the tasks the current filter and search would show
+    function emptyMessage(total, shownActive, shownDone) {
         if (total === 0) {
             return "No tasks yet. Add one above.";
         }
-        if (filter === "done" && doneCount === 0) {
-            return "No completed tasks yet.";
+        if (search) {
+            return shownActive + shownDone === 0 ? `No tasks match "${search}".` : "";
         }
-        if (filter !== "done" && activeCount === 0) {
-            return "Nothing left to do.";
+        if (filter === "done") {
+            return shownDone === 0 ? "No completed tasks yet." : "";
         }
-        return "";
+        return shownActive === 0 ? "Nothing left to do." : "";
     }
 
     function updateCountdowns(now) {
@@ -102,17 +110,18 @@ export function createTaskList(section, { tasks, settings }) {
 
     // ---- Actions on a task ----
 
-    function startTimer(row, task, minutes) {
+    // Closes the row's timer form, then makes the store call in `start`
+    function startTimer(row, start) {
         row.closeTimerForm({ focusTimerButton: true });
         requestNotificationPermission();
-        tasks.startTimer(task.id, minutes);
+        start();
     }
 
     // What each button with a data-action attribute does
     const actions = {
         edit: (row, task) => row.startEditing(task.text, (text) => tasks.rename(task.id, text)),
         timer: (row, task) => (task.timerEndsAt !== null ? tasks.stopTimer(task.id) : row.openTimerForm()),
-        preset: (row, task, button) => startTimer(row, task, Number(button.dataset.minutes)),
+        preset: (row, task, button) => startTimer(row, () => tasks.startTimer(task.id, Number(button.dataset.minutes))),
         "cancel-timer": (row) => row.closeTimerForm({ focusTimerButton: true }),
         delete: (row, task) => removeWithUndo(tasks, (t) => t.id === task.id, () => "Task deleted"),
     };
@@ -149,12 +158,14 @@ export function createTaskList(section, { tasks, settings }) {
         }
     });
 
-    // The browser only fires "submit" once the minutes field passes its required/min/max checks
+    // The browser only fires "submit" once the minutes field passes its min/max checks
     section.addEventListener("submit", (event) => {
         event.preventDefault();
         const { row, task } = rowOf(event.target);
-        if (row && task) {
-            startTimer(row, task, event.target.elements.minutes.valueAsNumber);
+        const now = Date.now();
+        const endsAt = row?.chosenTimerEnd(now);
+        if (task && endsAt) {
+            startTimer(row, () => tasks.startTimerUntil(task.id, endsAt, now));
         }
     });
 
@@ -193,6 +204,18 @@ export function createTaskList(section, { tasks, settings }) {
                 render();
             }
         },
+
+        // Shows only tasks whose name contains `text`, ignoring case. "" shows all.
+        setSearch(text) {
+            search = text;
+            render();
+        },
+
         updateCountdowns,
     };
+}
+
+// So characters like "." or "(" in a search match themselves
+function escapeRegExp(text) {
+    return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

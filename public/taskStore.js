@@ -30,6 +30,21 @@ export function createTaskStore(initialTasks) {
         }
     }
 
+    /**
+     * Starts a timer that ends at `endsAt` (epoch milliseconds), e.g. for a reminder at a time of day.
+     * Returns false, and changes nothing, for a completed task or a time that isn't in the future.
+     * @param {string} id
+     * @param {number} endsAt
+     */
+    function startTimerUntil(id, endsAt, now = Date.now()) {
+        const task = find(id);
+        if (!task || task.done || !Number.isFinite(endsAt) || endsAt <= now) {
+            return false;
+        }
+        update(id, { timerEndsAt: endsAt, timerDuration: endsAt - now });
+        return true;
+    }
+
     return {
         /** Calls `listener(tasks)` after every change. Returns a function that stops it. */
         subscribe,
@@ -76,19 +91,16 @@ export function createTaskStore(initialTasks) {
         },
 
         /**
-         * Returns false, and changes nothing, for a completed task or an invalid length.
+         * Starts a timer that runs for `minutes`. Returns false, and changes nothing,
+         * for a completed task or an invalid length.
          * @param {string} id
          * @param {number} minutes
          */
         startTimer(id, minutes, now = Date.now()) {
-            const task = find(id);
-            if (!task || task.done || !Number.isFinite(minutes) || minutes <= 0) {
-                return false;
-            }
-            const duration = minutes * 60 * 1000;
-            update(id, { timerEndsAt: now + duration, timerDuration: duration });
-            return true;
+            return startTimerUntil(id, now + minutes * 60 * 1000, now);
         },
+
+        startTimerUntil,
 
         /** @param {string} id */
         stopTimer(id) {
@@ -109,31 +121,30 @@ export function createTaskStore(initialTasks) {
         },
 
         /**
-         * Swaps an active task with the active task above (-1) or below (+1) it.
-         * @param {string} id
-         * @param {-1 | 1} direction
+         * Swaps the positions of two tasks, e.g. to move a task past the one shown next to it.
+         * @param {string} firstId
+         * @param {string} secondId
          */
-        move(id, direction) {
-            const activeTasks = tasks.filter((task) => !task.done);
-            const index = activeTasks.findIndex((task) => task.id === id);
-            const neighbor = activeTasks[index + direction];
-            if (index === -1 || !neighbor) {
+        swap(firstId, secondId) {
+            const first = tasks.findIndex((task) => task.id === firstId);
+            const second = tasks.findIndex((task) => task.id === secondId);
+            if (first === -1 || second === -1 || first === second) {
                 return;
             }
-            const from = tasks.indexOf(activeTasks[index]);
-            const to = tasks.indexOf(neighbor);
-            [tasks[from], tasks[to]] = [tasks[to], tasks[from]];
+            [tasks[first], tasks[second]] = [tasks[second], tasks[first]];
             changed();
         },
 
         /**
-         * Puts the active tasks in the given order, followed by everything else in its current order.
+         * Puts the given active tasks in this order, within the positions they already take up.
+         * Every other task stays where it is, so reordering a filtered list doesn't move hidden tasks.
          * @param {string[]} ids
          */
         reorderActive(ids) {
             const ordered = ids.map(find).filter((task) => task !== undefined && !task.done);
-            const rest = tasks.filter((task) => !ordered.includes(task));
-            tasks = [...ordered, ...rest];
+            const reordering = new Set(ordered);
+            let next = 0;
+            tasks = tasks.map((task) => (reordering.has(task) ? ordered[next++] : task));
             changed();
         },
 
